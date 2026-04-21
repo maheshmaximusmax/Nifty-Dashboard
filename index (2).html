@@ -1,0 +1,1845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NIFTY Option Chain — Live Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0b0f1a;
+  --bg2: #111827;
+  --bg3: #1a2236;
+  --card: #131c2e;
+  --border: #1e2d47;
+  --border2: #253554;
+  --text: #e2e8f4;
+  --text2: #94a3b8;
+  --text3: #4a5a78;
+  --accent: #3b82f6;
+  --accent2: #8b5cf6;
+  --green: #22c55e;
+  --green2: #16a34a;
+  --red: #ef4444;
+  --red2: #dc2626;
+  --orange: #f97316;
+  --yellow: #eab308;
+  --cyan: #06b6d4;
+  --nse-blue: #1e3a8a;
+  --nse-orange: #ea580c;
+  --ce-col: rgba(34,197,94,0.06);
+  --pe-col: rgba(239,68,68,0.06);
+  --radius: 10px;
+  --radius2: 6px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 13px;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+  border-bottom: 1px solid rgba(59,130,246,.3);
+  padding: 0 20px;
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top:0; z-index:200;
+  box-shadow: 0 2px 20px rgba(0,0,0,.5);
+}
+.topbar-left { display: flex; align-items: center; gap: 16px; }
+.logo-text {
+  font-size: 20px; font-weight: 800; letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.logo-sub { font-size: 10px; color: rgba(255,255,255,.4); font-weight: 500; letter-spacing: 1px; text-transform: uppercase; }
+
+.spot-chip {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px; padding: 5px 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.spot-label { font-size: 10px; color: rgba(255,255,255,.4); font-weight: 600; text-transform: uppercase; }
+.spot-value { font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 700; color: #fff; }
+.spot-chg { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.live-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.3);
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 11px; font-weight: 700; color: var(--green); letter-spacing: .5px;
+}
+.live-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: blink 1.2s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+#clockDisp { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(255,255,255,.5); }
+.mkt-badge { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 4px; letter-spacing: .5px; }
+.open  { background: rgba(34,197,94,.15);  color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+.closed{ background: rgba(239,68,68,.15);  color: var(--red);   border: 1px solid rgba(239,68,68,.3); }
+
+/* ── TABS ── */
+.tab-nav {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  display: flex; overflow-x: auto; padding: 0 16px;
+  scrollbar-width: none; position: sticky; top: 56px; z-index: 100;
+}
+.tab-nav::-webkit-scrollbar { display: none; }
+.tab-btn {
+  padding: 13px 18px; cursor: pointer; white-space: nowrap;
+  font-size: 12px; font-weight: 600; color: var(--text3);
+  border-bottom: 2px solid transparent; transition: .2s;
+  display: flex; align-items: center; gap: 6px;
+  letter-spacing: .2px; user-select: none;
+}
+.tab-btn:hover { color: var(--text2); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── PANELS ── */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── CONTROLS ── */
+.ctrl-bar {
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+}
+.ctrl-group { display: flex; align-items: center; gap: 8px; }
+.ctrl-label { font-size: 11px; color: var(--text2); font-weight: 600; }
+select, input[type=number] {
+  background: var(--bg3); border: 1px solid var(--border2);
+  color: var(--text); border-radius: var(--radius2);
+  padding: 6px 10px; font-size: 12px; font-family: 'Inter', sans-serif;
+  outline: none; cursor: pointer; appearance: none;
+  min-width: 130px;
+}
+select:focus { border-color: var(--accent); }
+.btn {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius2); padding: 7px 16px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  transition: .15s; letter-spacing: .3px;
+}
+.btn:hover { background: #2563eb; transform: translateY(-1px); }
+.btn:active { transform: none; }
+.btn-sm {
+  background: transparent; color: var(--text2); border: 1px solid var(--border2);
+  border-radius: var(--radius2); padding: 5px 12px;
+  font-size: 11px; font-weight: 600; cursor: pointer; transition: .15s;
+}
+.btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+.status-txt { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 6px; }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── METRIC CARDS ── */
+.metrics-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px; padding: 16px 20px;
+}
+.mc {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px;
+  transition: border-color .2s;
+}
+.mc:hover { border-color: var(--border2); }
+.mc-label { font-size: 10px; color: var(--text3); font-weight: 700; letter-spacing: .7px; text-transform: uppercase; margin-bottom: 6px; }
+.mc-value { font-family: 'JetBrains Mono', monospace; font-size: 19px; font-weight: 700; line-height: 1; }
+.mc-sub { font-size: 10px; color: var(--text3); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+.c-green { color: var(--green); }
+.c-red   { color: var(--red); }
+.c-blue  { color: var(--accent); }
+.c-orange{ color: var(--orange); }
+.c-cyan  { color: var(--cyan); }
+.c-purple{ color: var(--accent2); }
+
+/* ── CHARTS AREA ── */
+.charts-area { padding: 0 20px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.charts-area3 { padding: 0 20px 16px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+@media(max-width:900px) { .charts-area,.charts-area3 { grid-template-columns: 1fr; } }
+.chart-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+}
+.chart-card-hd {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.chart-card-title { font-size: 12px; font-weight: 700; color: var(--text2); }
+.chart-card-body { padding: 12px; }
+
+/* ══════════════════════════════════════════
+   NSE-STYLE OPTION CHAIN TABLE
+══════════════════════════════════════════ */
+.nse-chain-wrap {
+  padding: 0 20px 20px;
+}
+.nse-chain-header {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nse-chain-title { font-size: 14px; font-weight: 700; }
+.nse-chain-sub { font-size: 11px; color: var(--text3); }
+.nse-chain-filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.nse-filter-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 6px; padding: 5px 10px; font-size: 11px; color: var(--text2);
+}
+.nse-filter-chip select {
+  background: transparent; border: none; color: var(--text); font-size: 11px;
+  padding: 0; min-width: auto; cursor: pointer; outline: none;
+}
+.nse-underlying {
+  padding: 8px 16px; background: rgba(59,130,246,.06); border-left: 3px solid var(--accent);
+  font-size: 12px; color: var(--text2);
+  border-bottom: 1px solid var(--border);
+}
+.nse-underlying strong { color: var(--text); }
+
+/* THE TABLE */
+.nse-table-scroll { overflow-x: auto; max-height: 620px; overflow-y: auto; }
+.nse-table-scroll::-webkit-scrollbar { width:6px; height:6px; }
+.nse-table-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius:3px; }
+
+table.oc {
+  width: 100%; border-collapse: collapse;
+  font-size: 11.5px; font-family: 'JetBrains Mono', monospace;
+}
+table.oc thead { position: sticky; top: 0; z-index: 10; }
+table.oc th {
+  background: #1a2236; color: var(--text2);
+  padding: 8px 6px; text-align: right;
+  font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  border-bottom: 2px solid var(--border2); white-space: nowrap;
+}
+table.oc th.hdr-group {
+  text-align: center; font-size: 11px; letter-spacing: 1px;
+  border-bottom: 1px solid var(--border2);
+}
+table.oc th.ce-hdr { color: var(--green); background: rgba(34,197,94,.08); }
+table.oc th.pe-hdr { color: var(--red);   background: rgba(239,68,68,.08); }
+table.oc th.strike-hdr { background: #1e2d47; color: var(--accent); text-align: center; }
+table.oc td {
+  padding: 6px 6px; text-align: right; border-bottom: 1px solid rgba(30,45,71,.5);
+  transition: background .08s; white-space: nowrap;
+}
+table.oc tr:hover td { background: rgba(255,255,255,.025); }
+table.oc td.ce-td { background: var(--ce-col); }
+table.oc td.pe-td { background: var(--pe-col); }
+table.oc td.strike-td {
+  background: rgba(59,130,246,.08); color: var(--accent);
+  font-weight: 700; font-size: 12px; text-align: center;
+  border-left: 1px solid rgba(59,130,246,.2); border-right: 1px solid rgba(59,130,246,.2);
+  cursor: pointer; position: relative;
+}
+table.oc tr.atm-row td { background: rgba(59,130,246,.08) !important; }
+table.oc tr.atm-row td.ce-td { background: rgba(59,130,246,.12) !important; }
+table.oc tr.atm-row td.pe-td { background: rgba(59,130,246,.12) !important; }
+table.oc tr.atm-row td.strike-td {
+  background: rgba(59,130,246,.25) !important; color: #fff !important; font-size: 13px;
+}
+.atm-tag {
+  display: inline-block; font-size: 8px; font-weight: 800; padding: 1px 4px;
+  background: var(--accent); color: #fff; border-radius: 3px; margin-left: 3px; vertical-align: middle;
+}
+.up-val { color: var(--green); }
+.dn-val { color: var(--red); }
+.iv-val { color: var(--orange); }
+.vol-val { color: var(--cyan); }
+.na-val { color: var(--text3); }
+
+/* OI bar in cells */
+.oi-cell { position: relative; overflow: hidden; }
+.oi-bg {
+  position: absolute; top: 0; bottom: 0; left: 0;
+  border-radius: 0; opacity: .18; pointer-events: none;
+}
+.oi-bg-ce { background: var(--green); }
+.oi-bg-pe { background: var(--red); }
+.oi-num { position: relative; z-index: 1; }
+
+/* ── PCR Gauge ── */
+.pcr-section { padding: 0 20px 16px; display: grid; grid-template-columns: 300px 1fr; gap: 14px; }
+@media(max-width:700px){ .pcr-section { grid-template-columns:1fr; } }
+.gauge-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.gauge-title { font-size: 12px; font-weight: 700; color: var(--text2); align-self: flex-start; }
+.gauge-num { font-family: 'JetBrains Mono', monospace; font-size: 36px; font-weight: 800; }
+.gauge-track { width: 100%; height: 14px; border-radius: 7px; background: var(--bg3); overflow: hidden; border: 1px solid var(--border2); }
+.gauge-fill { height: 100%; border-radius: 7px; background: linear-gradient(90deg, #ef4444 0%, #f97316 30%, #eab308 50%, #22c55e 70%, #3b82f6 100%); transition: width .5s ease; }
+.gauge-ticks { width: 100%; display: flex; justify-content: space-between; font-size: 9px; color: var(--text3); }
+.sentiment-pill { font-size: 13px; font-weight: 800; padding: 6px 20px; border-radius: 20px; letter-spacing: .5px; }
+.bull-pill { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+.bear-pill { background: rgba(239,68,68,.15);  color: var(--red);   border: 1px solid rgba(239,68,68,.3); }
+.neut-pill { background: rgba(249,115,22,.15); color: var(--orange); border: 1px solid rgba(249,115,22,.3); }
+
+/* ── TOP OI ── */
+.top-oi-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.top-oi-hd { padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700; color: var(--text2); }
+.top-oi-body { padding: 0; }
+table.top-oi-t { width:100%; border-collapse:collapse; font-size:11.5px; }
+table.top-oi-t th { background: var(--bg3); color: var(--text3); padding: 7px 10px; font-size: 10px; font-weight: 700; text-align: center; border-bottom: 1px solid var(--border); letter-spacing: .5px; text-transform: uppercase; }
+table.top-oi-t td { padding: 7px 10px; text-align: center; border-bottom: 1px solid rgba(30,45,71,.5); font-family: 'JetBrains Mono', monospace; }
+
+/* ── SETTINGS ── */
+.settings-wrap { padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media(max-width:800px){ .settings-wrap { grid-template-columns:1fr; } }
+.s-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.s-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.s-card h3 span { color: var(--accent); }
+.f-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.f-row label { font-size: 11px; font-weight: 600; color: var(--text2); }
+.f-row input, .f-row textarea, .f-row select { width: 100%; padding: 8px 11px; border: 1px solid var(--border2); background: var(--bg3); color: var(--text); border-radius: var(--radius2); font-size: 12px; outline: none; font-family: 'JetBrains Mono', monospace; }
+.f-row textarea { resize: vertical; min-height: 80px; }
+.f-row input:focus, .f-row textarea:focus { border-color: var(--accent); }
+.hint { font-size: 10px; color: var(--text3); margin-top: 3px; }
+.alert { padding: 10px 14px; border-radius: var(--radius2); font-size: 12px; margin-bottom: 14px; line-height: 1.5; }
+.alert a { color: var(--accent); }
+.a-info { background: rgba(59,130,246,.1); border: 1px solid rgba(59,130,246,.25); color: #93c5fd; }
+.a-warn { background: rgba(249,115,22,.1); border: 1px solid rgba(249,115,22,.25); color: #fdba74; }
+.a-ok   { background: rgba(34,197,94,.1);  border: 1px solid rgba(34,197,94,.25);  color: #86efac; }
+.a-err  { background: rgba(239,68,68,.1);  border: 1px solid rgba(239,68,68,.25);  color: #fca5a5; }
+.step-list { counter-reset:steps; list-style:none; padding:0; }
+.step-list li { counter-increment:steps; display:flex; gap:10px; margin-bottom:10px; font-size:12px; color:var(--text2); line-height:1.5; }
+.step-list li::before { content:counter(steps); width:22px; height:22px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:#fff; flex-shrink:0; }
+code { background: var(--bg3); border: 1px solid var(--border2); border-radius:3px; padding:1px 5px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--cyan); }
+
+/* ── CHATBOT ── */
+.chat-wrap { padding: 20px; display: grid; grid-template-columns: 1fr 340px; gap: 16px; }
+@media(max-width:800px){ .chat-wrap { grid-template-columns:1fr; } }
+.chat-main { display: flex; flex-direction: column; gap: 12px; }
+.chat-window {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  height: 450px; overflow-y: auto; padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  scroll-behavior: smooth;
+}
+.chat-window::-webkit-scrollbar { width: 4px; }
+.chat-window::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.msg { max-width: 82%; }
+.msg-label { font-size: 10px; color: var(--text3); font-weight: 700; margin-bottom: 4px; letter-spacing: .5px; }
+.msg-bubble { padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.msg-user .msg-label { text-align: right; }
+.msg-user { align-self: flex-end; }
+.msg-user .msg-bubble { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border-bottom-right-radius: 3px; }
+.msg-ai .msg-bubble { background: var(--bg3); border: 1px solid var(--border2); color: var(--text); border-bottom-left-radius: 3px; }
+.chat-input-row { display: flex; gap: 10px; }
+.chat-input-row input { flex:1; padding: 10px 14px; font-size: 13px; border-radius: var(--radius2); background: var(--card); border: 1px solid var(--border2); color: var(--text); font-family: 'Inter', sans-serif; outline: none; }
+.chat-input-row input:focus { border-color: var(--accent); }
+.thinking { display: flex; gap: 5px; align-items: center; padding: 10px 14px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; border-bottom-left-radius: 3px; align-self: flex-start; }
+.d1,.d2,.d3 { width:7px;height:7px;background:var(--text3);border-radius:50%;animation:bloop .9s infinite; }
+.d2{animation-delay:.15s}.d3{animation-delay:.3s}
+@keyframes bloop {0%,80%,100%{transform:scale(0.2)}40%{transform:scale(1)}}
+.quick-btn { width:100%; text-align:left; padding:9px 12px; background:var(--bg3); border:1px solid var(--border2); color:var(--text2); border-radius:var(--radius2); cursor:pointer; font-size:12px; transition:.15s; margin-bottom:6px; }
+.quick-btn:hover { border-color:var(--accent); color:var(--accent); background:rgba(59,130,246,.05); }
+
+/* ── MAX PAIN ── */
+.mp-wrap { padding: 0 20px 20px; display: grid; grid-template-columns: 1fr 380px; gap: 14px; }
+@media(max-width:900px){ .mp-wrap { grid-template-columns:1fr; } }
+.mp-chart-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.mp-hd { padding:11px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.mp-title { font-size:13px; font-weight:700; }
+.mp-strike-chip { background:rgba(249,115,22,.15); border:1px solid rgba(249,115,22,.3); color:var(--orange); padding:4px 12px; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; }
+.mp-table-wrap { max-height:500px; overflow-y:auto; }
+table.mp-t { width:100%; border-collapse:collapse; font-size:11.5px; }
+table.mp-t th { background:var(--bg3); color:var(--text3); padding:7px 10px; text-align:right; font-size:10px; font-weight:700; border-bottom:1px solid var(--border); text-transform:uppercase; letter-spacing:.5px; }
+table.mp-t th:first-child { text-align:center; }
+table.mp-t td { padding:6px 10px; text-align:right; border-bottom:1px solid rgba(30,45,71,.4); font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+table.mp-t td:first-child { text-align:center; font-weight:700; }
+tr.mp-highlight td { background:rgba(249,115,22,.1); color:var(--orange); }
+
+/* ── HEATMAP ── */
+.hm-wrap { padding: 0 20px 20px; }
+.hm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px,1fr)); gap: 4px; padding: 14px; }
+.hm-cell { border-radius: 6px; padding: 10px 6px; text-align: center; cursor: pointer; transition: transform .12s; }
+.hm-cell:hover { transform: scale(1.06); z-index: 1; }
+.hm-strike { font-size: 10px; color: rgba(255,255,255,.5); margin-bottom: 3px; font-family: 'JetBrains Mono', monospace; }
+.hm-val { font-size: 13px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+
+/* ── EXPIRY BADGES ── */
+.exp-badges { padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 7px; border-bottom: 1px solid var(--border); }
+.exp-badge {
+  font-size: 11px; font-weight: 600; padding: 4px 11px; border-radius: 20px; cursor: pointer;
+  border: 1px solid var(--border2); color: var(--text2); transition: .15s; font-family: 'JetBrains Mono', monospace;
+}
+.exp-badge:hover { border-color: var(--accent); color: var(--accent); }
+.exp-badge.active { background: rgba(59,130,246,.15); border-color: var(--accent); color: var(--accent); }
+
+/* ── NSE STYLE TAB ── */
+.nse-style-header {
+  background: #fff; border-bottom: 3px solid #1e3a8a;
+  padding: 16px 20px 10px;
+  color: #1e3a8a;
+}
+.nse-page-title { font-size: 20px; font-weight: 700; color: #1e3a8a; margin-bottom: 14px; }
+.nse-controls-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; margin-bottom: 12px; }
+.nse-ctrl-group { display: flex; flex-direction: column; gap: 4px; }
+.nse-ctrl-label { font-size: 12px; color: #666; font-weight: 500; }
+select.nse-sel {
+  background: #fff; border: 1px solid #e97316; color: #e97316;
+  border-radius: 6px; padding: 7px 30px 7px 12px; font-size: 13px; font-weight: 600;
+  min-width: 140px; cursor: pointer; outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e97316' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+}
+.nse-or { font-size: 12px; color: #666; font-weight: 500; padding-bottom: 10px; }
+.nse-underlying-bar {
+  font-size: 13px; color: #444; padding: 6px 0;
+  border-top: 1px solid #e5e7eb;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nse-underlying-bar strong { color: #1e3a8a; }
+.nse-download-row { display: flex; align-items: center; gap: 12px; }
+.nse-dl-btn { font-size: 12px; font-weight: 600; color: #ea580c; cursor: pointer; display: flex; align-items: center; gap: 5px; text-decoration: none; }
+
+/* NSE Table */
+.nse-tbl-wrap { background: #fff; }
+.nse-tbl-scroll { overflow-x: auto; }
+table.nse-oc { width: 100%; border-collapse: collapse; font-size: 12px; color: #333; }
+table.nse-oc thead th { padding: 8px 6px; font-weight: 700; border: 1px solid #ddd; white-space: nowrap; font-size: 11px; }
+table.nse-oc thead .ce-grp { background: #1e3a8a; color: #fff; text-align: center; }
+table.nse-oc thead .pe-grp { background: #1e3a8a; color: #fff; text-align: center; }
+table.nse-oc thead .strike-grp { background: #374151; color: #fff; text-align: center; }
+table.nse-oc thead .sub-th { background: #f3f4f6; color: #374151; text-align: right; font-size: 10px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
+table.nse-oc thead .sub-th.center-th { text-align: center; }
+table.nse-oc td { padding: 5px 6px; border: 1px solid #e5e7eb; text-align: right; white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; }
+table.nse-oc td.ce-td { background: #f0fdf4; }
+table.nse-oc td.pe-td { background: #fff5f5; }
+table.nse-oc td.strike-td { background: #eff6ff; color: #1e3a8a; font-weight: 700; text-align: center; cursor: pointer; }
+table.nse-oc tr.nse-atm td { background: #dbeafe !important; }
+table.nse-oc tr.nse-atm td.strike-td { background: #bfdbfe !important; color: #1d4ed8 !important; font-weight: 800; }
+table.nse-oc .nse-up { color: #16a34a; }
+table.nse-oc .nse-dn { color: #dc2626; }
+table.nse-oc .nse-na { color: #9ca3af; }
+table.nse-oc .nse-iv { color: #9a3412; font-weight: 600; }
+table.nse-oc .nse-ltp { font-weight: 700; }
+table.nse-oc .oi-link { color: #1e3a8a; text-decoration: underline; cursor: pointer; font-weight: 600; }
+
+/* scrollbar for nse */
+.nse-tbl-scroll::-webkit-scrollbar { height: 6px; }
+.nse-tbl-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+/* ── MISC ── */
+.divider { height: 1px; background: var(--border); margin: 0 20px; }
+.full-pad { padding: 16px 20px; }
+.flex-between { display:flex; align-items:center; justify-content:space-between; }
+.tag { display:inline-block; font-size:9px; font-weight:800; padding:1px 5px; border-radius:3px; margin-left:4px; vertical-align:middle; }
+.tag-itm { background:rgba(34,197,94,.2); color:var(--green); }
+.tag-otm { background:rgba(239,68,68,.12); color:var(--red); }
+
+/* fetch error */
+#fetchErrBar { display:none; background:rgba(249,115,22,.1); border:1px solid rgba(249,115,22,.3); color:#fdba74; padding:8px 20px; font-size:12px; }
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ══ -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div>
+      <div class="logo-text">⚡ NIFTY OPTION PRO</div>
+      <div class="logo-sub">Live Dashboard</div>
+    </div>
+    <div class="spot-chip">
+      <div>
+        <div class="spot-label">NIFTY SPOT</div>
+        <div class="spot-value" id="topSpot">—</div>
+      </div>
+      <div>
+        <div class="spot-chg" id="topChg" style="color:var(--green)">—</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.3)" id="topDate">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+    <div class="mkt-badge closed" id="mktBadge">CLOSED</div>
+    <div id="clockDisp">--:--:--</div>
+  </div>
+</div>
+
+<!-- ══ TAB NAV ══ -->
+<div class="tab-nav">
+  <div class="tab-btn active" data-tab="dashboard"  onclick="switchTab(this,'dashboard')">📊 Dashboard</div>
+  <div class="tab-btn"        data-tab="nse"         onclick="switchTab(this,'nse')">🏛️ NSE Style Chain</div>
+  <div class="tab-btn"        data-tab="chain"       onclick="switchTab(this,'chain')">🔗 Option Chain</div>
+  <div class="tab-btn"        data-tab="oi"          onclick="switchTab(this,'oi')">📈 OI Analysis</div>
+  <div class="tab-btn"        data-tab="maxpain"     onclick="switchTab(this,'maxpain')">💀 Max Pain</div>
+  <div class="tab-btn"        data-tab="heatmap"     onclick="switchTab(this,'heatmap')">🌡️ Heatmap</div>
+  <div class="tab-btn"        data-tab="charts"      onclick="switchTab(this,'charts')">📉 Charts</div>
+  <div class="tab-btn"        data-tab="chatbot"     onclick="switchTab(this,'chatbot')">🤖 AI Chat</div>
+  <div class="tab-btn"        data-tab="settings"    onclick="switchTab(this,'settings')">⚙️ Settings</div>
+</div>
+
+<div id="fetchErrBar">
+  ⚠️ Could not reach NSE directly. Showing cached/sample data. 
+  Add a valid NSE cookie in Settings → NSE Configuration to get live data.
+</div>
+
+<!-- ════════ DASHBOARD ════════ -->
+<div class="panel active" id="panel-dashboard">
+  <!-- Controls -->
+  <div class="ctrl-bar">
+    <div class="ctrl-group">
+      <span class="ctrl-label">Symbol</span>
+      <select id="symSel" onchange="onSymChange()">
+        <option value="NIFTY" selected>NIFTY</option>
+        <option value="BANKNIFTY">BANKNIFTY</option>
+        <option value="FINNIFTY">FINNIFTY</option>
+        <option value="MIDCPNIFTY">MIDCPNIFTY</option>
+        <option value="SENSEX">SENSEX</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Expiry</span>
+      <select id="expSel" onchange="onExpChange()"></select>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">ATM ±</span>
+      <select id="rangeSel" onchange="applyFilter()">
+        <option value="10">±10 strikes</option>
+        <option value="15" selected>±15 strikes</option>
+        <option value="20">±20 strikes</option>
+        <option value="999">All strikes</option>
+      </select>
+    </div>
+    <button class="btn" onclick="doFetch()">⟳ Refresh</button>
+    <button class="btn-sm" onclick="downloadCSV()">⬇ CSV</button>
+    <div class="status-txt">
+      <span id="loadSpin" style="display:none"><span class="spin"></span></span>
+      <span id="lastUpd">—</span>
+    </div>
+  </div>
+  <!-- Expiry badges -->
+  <div class="exp-badges" id="expBadges"></div>
+  <!-- Metrics -->
+  <div class="metrics-grid">
+    <div class="mc"><div class="mc-label">Spot Price</div><div class="mc-value c-blue" id="mSpot">—</div><div class="mc-sub" id="mSpotChg">—</div></div>
+    <div class="mc"><div class="mc-label">ATM Strike</div><div class="mc-value" id="mATM">—</div><div class="mc-sub">Nearest</div></div>
+    <div class="mc"><div class="mc-label">PCR (OI)</div><div class="mc-value" id="mPCR">—</div><div class="mc-sub" id="mPCRsub">—</div></div>
+    <div class="mc"><div class="mc-label">Total CE OI</div><div class="mc-value c-green" id="mCEOI">—</div><div class="mc-sub">Calls OI</div></div>
+    <div class="mc"><div class="mc-label">Total PE OI</div><div class="mc-value c-red" id="mPEOI">—</div><div class="mc-sub">Puts OI</div></div>
+    <div class="mc"><div class="mc-label">Max Pain</div><div class="mc-value c-orange" id="mMP">—</div><div class="mc-sub">Strike</div></div>
+    <div class="mc"><div class="mc-label">ATM CE IV</div><div class="mc-value c-orange" id="mCEIV">—</div><div class="mc-sub">Implied Vol</div></div>
+    <div class="mc"><div class="mc-label">ATM PE IV</div><div class="mc-value c-orange" id="mPEIV">—</div><div class="mc-sub">Implied Vol</div></div>
+    <div class="mc"><div class="mc-label">CE OI Buildup</div><div class="mc-value c-cyan" id="mCEBuild">—</div><div class="mc-sub">+Chg OI</div></div>
+    <div class="mc"><div class="mc-label">PE OI Buildup</div><div class="mc-value c-purple" id="mPEBuild">—</div><div class="mc-sub">+Chg OI</div></div>
+  </div>
+  <!-- PCR + Top OI -->
+  <div class="pcr-section">
+    <div class="gauge-card">
+      <div class="gauge-title">Put-Call Ratio (OI)</div>
+      <div class="gauge-num" id="gPCR">—</div>
+      <div class="gauge-track" style="width:100%"><div class="gauge-fill" id="gFill" style="width:50%"></div></div>
+      <div class="gauge-ticks"><span>BEARISH</span><span>NEUTRAL</span><span>BULLISH</span></div>
+      <div class="sentiment-pill neut-pill" id="gSent">NEUTRAL</div>
+    </div>
+    <div class="top-oi-card">
+      <div class="top-oi-hd">🏆 Top OI Strikes (CE + PE)</div>
+      <div class="top-oi-body">
+        <table class="top-oi-t">
+          <thead><tr><th>Type</th><th>Strike</th><th>OI (Lots)</th><th>Chg OI</th><th>IV%</th><th>LTP</th></tr></thead>
+          <tbody id="topOIbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <!-- Charts -->
+  <div class="charts-area">
+    <div class="chart-card">
+      <div class="chart-card-hd"><div class="chart-card-title">📊 CE vs PE Open Interest</div></div>
+      <div class="chart-card-body"><canvas id="cOIbar" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-hd"><div class="chart-card-title">📉 IV Smile / Skew</div></div>
+      <div class="chart-card-body"><canvas id="cIV" height="200"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-area">
+    <div class="chart-card">
+      <div class="chart-card-hd"><div class="chart-card-title">🔄 Change in OI (CE vs PE)</div></div>
+      <div class="chart-card-body"><canvas id="cChgOI" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-hd"><div class="chart-card-title">💰 LTP Comparison (CE vs PE)</div></div>
+      <div class="chart-card-body"><canvas id="cLTP" height="200"></canvas></div>
+    </div>
+  </div>
+</div><!-- /dashboard -->
+
+<!-- ════════ NSE STYLE ════════ -->
+<div class="panel" id="panel-nse">
+  <div class="nse-style-header">
+    <div class="nse-page-title">Option Chain (Equity Derivatives)</div>
+    <div class="nse-controls-row">
+      <div class="nse-ctrl-group">
+        <div class="nse-ctrl-label">View Options Contracts for:</div>
+        <select class="nse-sel" id="nseSymSel" onchange="onNSESymChange()">
+          <option value="NIFTY">NIFTY</option>
+          <option value="BANKNIFTY">BANKNIFTY</option>
+          <option value="FINNIFTY">FINNIFTY</option>
+          <option value="MIDCPNIFTY">MIDCPNIFTY</option>
+          <option value="SENSEX">SENSEX</option>
+        </select>
+      </div>
+      <div class="nse-or">OR</div>
+      <div class="nse-ctrl-group">
+        <div class="nse-ctrl-label">Select Symbol</div>
+        <select class="nse-sel" id="nseStockSel" style="min-width:160px">
+          <option value="">Select</option>
+        </select>
+      </div>
+      <div class="nse-ctrl-group">
+        <div class="nse-ctrl-label">Expiry Date</div>
+        <select class="nse-sel" id="nseExpSel" onchange="onNSEExpChange()"></select>
+      </div>
+      <div class="nse-or">OR</div>
+      <div class="nse-ctrl-group">
+        <div class="nse-ctrl-label">Strike Price</div>
+        <select class="nse-sel" id="nseStrikeSel" onchange="onNSEStrikeChange()" style="min-width:120px">
+          <option value="">Select</option>
+        </select>
+      </div>
+    </div>
+    <div class="nse-underlying-bar">
+      <div>Underlying Index : <strong id="nseUnderlying">NIFTY —</strong> <span id="nseAsOn" style="color:#888;font-size:12px">As on —</span></div>
+      <div class="nse-download-row">
+        <span style="color:#1e3a8a;font-size:12px;font-weight:600;cursor:pointer">Terms of Use</span>
+        <span style="color:#1e3a8a;font-size:12px;font-weight:600;cursor:pointer">⛶ Best View</span>
+        <span class="nse-dl-btn" onclick="downloadCSV()">📥 Download (.csv)</span>
+      </div>
+    </div>
+  </div>
+  <div class="nse-tbl-wrap">
+    <div class="nse-tbl-scroll">
+      <table class="nse-oc" id="nseTable">
+        <thead>
+          <tr>
+            <th colspan="10" class="ce-grp hdr-group">CALLS</th>
+            <th class="strike-grp hdr-group">STRIKE</th>
+            <th colspan="10" class="pe-grp hdr-group">PUTS</th>
+          </tr>
+          <tr>
+            <!-- CE cols -->
+            <th class="sub-th">OI</th>
+            <th class="sub-th">CHNG IN OI</th>
+            <th class="sub-th">VOLUME</th>
+            <th class="sub-th">IV</th>
+            <th class="sub-th">LTP</th>
+            <th class="sub-th">CHNG</th>
+            <th class="sub-th">BID QTY</th>
+            <th class="sub-th">BID</th>
+            <th class="sub-th">ASK</th>
+            <th class="sub-th">ASK QTY</th>
+            <!-- STRIKE -->
+            <th class="sub-th center-th" style="background:#e5e7eb;color:#374151">STRIKE</th>
+            <!-- PE cols -->
+            <th class="sub-th">BID QTY</th>
+            <th class="sub-th">BID</th>
+            <th class="sub-th">ASK</th>
+            <th class="sub-th">ASK QTY</th>
+            <th class="sub-th">CHNG</th>
+            <th class="sub-th">LTP</th>
+            <th class="sub-th">IV</th>
+            <th class="sub-th">VOLUME</th>
+            <th class="sub-th">CHNG IN OI</th>
+            <th class="sub-th">OI</th>
+          </tr>
+        </thead>
+        <tbody id="nseTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div><!-- /nse -->
+
+<!-- ════════ OPTION CHAIN (Dark) ════════ -->
+<div class="panel" id="panel-chain">
+  <div class="ctrl-bar">
+    <div class="ctrl-group"><span class="ctrl-label">Expiry</span><select id="chainExpSel" onchange="renderChain()"></select></div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">ATM ±</span>
+      <select id="chainRange" onchange="renderChain()">
+        <option value="10">±10</option><option value="15" selected>±15</option><option value="999">All</option>
+      </select>
+    </div>
+    <button class="btn" onclick="doFetch()">⟳ Refresh</button>
+  </div>
+  <div class="nse-chain-wrap">
+    <div class="nse-chain-header flex-between">
+      <div>
+        <div class="nse-chain-title">🔗 NIFTY Option Chain</div>
+        <div class="nse-chain-sub">CE = Calls · PE = Puts · <span style="color:var(--accent)">ATM highlighted</span> · OI bars show relative size</div>
+      </div>
+      <button class="btn-sm" onclick="downloadCSV()">⬇ Download CSV</button>
+    </div>
+    <div class="nse-underlying" id="chainUnderlying">Underlying: —</div>
+    <div class="nse-table-scroll">
+      <table class="oc" id="darkChain">
+        <thead>
+          <tr>
+            <th colspan="10" class="hdr-group ce-hdr">CALLS (CE)</th>
+            <th class="hdr-group strike-hdr" rowspan="2" style="min-width:90px">STRIKE</th>
+            <th colspan="10" class="hdr-group pe-hdr">PUTS (PE)</th>
+          </tr>
+          <tr>
+            <th class="ce-hdr">OI</th><th class="ce-hdr">CHNG OI</th><th class="ce-hdr">%CHNG</th>
+            <th class="ce-hdr">VOL</th><th class="ce-hdr">IV%</th><th class="ce-hdr">LTP</th>
+            <th class="ce-hdr">CHNG</th><th class="ce-hdr">BID</th><th class="ce-hdr">ASK</th><th class="ce-hdr" style="border-right:2px solid rgba(59,130,246,.3)">BQTY</th>
+            <th class="pe-hdr">BQTY</th><th class="pe-hdr">BID</th><th class="pe-hdr">ASK</th>
+            <th class="pe-hdr">CHNG</th><th class="pe-hdr">LTP</th><th class="pe-hdr">IV%</th>
+            <th class="pe-hdr">VOL</th><th class="pe-hdr">%CHNG</th><th class="pe-hdr">CHNG OI</th><th class="pe-hdr">OI</th>
+          </tr>
+        </thead>
+        <tbody id="darkChainBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div><!-- /chain -->
+
+<!-- ════════ OI ANALYSIS ════════ -->
+<div class="panel" id="panel-oi">
+  <div class="metrics-grid" id="oiMetrics"></div>
+  <div class="charts-area">
+    <div class="chart-card">
+      <div class="chart-card-hd"><div class="chart-card-title">📊 PCR by Expiry</div></div>
+      <div class="chart-card-body"><canvas id="cPCRbyExp" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-hd"><div class="chart-card-title">📊 OI All Strikes</div></div>
+      <div class="chart-card-body"><canvas id="cOIall" height="200"></canvas></div>
+    </div>
+  </div>
+  <div class="full-pad">
+    <div class="top-oi-card">
+      <div class="top-oi-hd">🔑 Support & Resistance Levels (from OI)</div>
+      <div class="top-oi-body" id="srBody"></div>
+    </div>
+  </div>
+</div><!-- /oi -->
+
+<!-- ════════ MAX PAIN ════════ -->
+<div class="panel" id="panel-maxpain">
+  <div class="ctrl-bar">
+    <div class="ctrl-group"><span class="ctrl-label">Expiry</span><select id="mpExpSel" onchange="renderMaxPain()"></select></div>
+  </div>
+  <div class="mp-wrap">
+    <div class="mp-chart-card">
+      <div class="mp-hd flex-between">
+        <div class="mp-title">💀 Max Pain Curve</div>
+        <div class="mp-strike-chip" id="mpChip">—</div>
+      </div>
+      <div style="padding:14px"><canvas id="cMP" height="280"></canvas></div>
+    </div>
+    <div class="mp-chart-card">
+      <div class="mp-hd"><div class="mp-title">📋 Max Pain Table</div></div>
+      <div class="mp-table-wrap">
+        <table class="mp-t">
+          <thead><tr><th>Strike</th><th>CE OI</th><th>PE OI</th><th>CE Loss</th><th>PE Loss</th><th>Total</th></tr></thead>
+          <tbody id="mpTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div><!-- /maxpain -->
+
+<!-- ════════ HEATMAP ════════ -->
+<div class="panel" id="panel-heatmap">
+  <div class="ctrl-bar">
+    <div class="ctrl-group">
+      <span class="ctrl-label">Metric</span>
+      <select id="hmMetric" onchange="renderHeatmap()">
+        <option value="oi">Open Interest</option>
+        <option value="iv">Implied Volatility</option>
+        <option value="ltp">LTP (Last Price)</option>
+        <option value="vol">Volume</option>
+        <option value="chgoi">Change in OI</option>
+      </select>
+    </div>
+  </div>
+  <div class="hm-wrap">
+    <div class="charts-area">
+      <div class="chart-card">
+        <div class="chart-card-hd"><div class="chart-card-title" id="hmCEtitle">📊 CE Heatmap</div></div>
+        <div class="hm-grid" id="hmCE"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-hd"><div class="chart-card-title" id="hmPEtitle">📊 PE Heatmap</div></div>
+        <div class="hm-grid" id="hmPE"></div>
+      </div>
+    </div>
+  </div>
+</div><!-- /heatmap -->
+
+<!-- ════════ CHARTS ════════ -->
+<div class="panel" id="panel-charts">
+  <div class="charts-area">
+    <div class="chart-card">
+      <div class="chart-card-hd"><div class="chart-card-title">CE: Volume vs OI</div></div>
+      <div class="chart-card-body"><canvas id="cVolCE" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-hd"><div class="chart-card-title">PE: Volume vs OI</div></div>
+      <div class="chart-card-body"><canvas id="cVolPE" height="200"></canvas></div>
+    </div>
+  </div>
+  <div class="full-pad" style="padding-top:0">
+    <div class="chart-card">
+      <div class="chart-card-hd"><div class="chart-card-title">🌊 IV Comparison — All Strikes (CE vs PE)</div></div>
+      <div class="chart-card-body"><canvas id="cIVall" height="200"></canvas></div>
+    </div>
+  </div>
+</div><!-- /charts -->
+
+<!-- ════════ AI CHAT ════════ -->
+<div class="panel" id="panel-chatbot">
+  <div class="chat-wrap">
+    <div class="chat-main">
+      <div class="chat-window" id="chatWin">
+        <div class="msg msg-ai">
+          <div class="msg-label">AI ASSISTANT (QWEN)</div>
+          <div class="msg-bubble">👋 Hello! I'm your NIFTY option chain analyst. I can help you interpret PCR, OI buildup, Max Pain, IV skew, and suggest strategies. Configure your Qwen API key in Settings, load live data, then ask me anything!</div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input id="chatIn" placeholder="Ask about PCR, Max Pain, OI, strategy..." onkeydown="if(event.key==='Enter')sendChat()">
+        <button class="btn" onclick="sendChat()">Send ➤</button>
+        <button class="btn-sm" onclick="clearChat()">Clear</button>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="chart-card" style="padding:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px">⚡ Quick Prompts</div>
+        <button class="quick-btn" onclick="qp('What is the current market sentiment based on PCR and OI?')">📡 Market Sentiment</button>
+        <button class="quick-btn" onclick="qp('What are the key support and resistance levels from option chain OI?')">🔑 Support & Resistance</button>
+        <button class="quick-btn" onclick="qp('Explain the Max Pain level and how far it is from current spot.')">💀 Max Pain</button>
+        <button class="quick-btn" onclick="qp('Analyze IV skew and suggest appropriate option strategies.')">📈 IV Strategy</button>
+        <button class="quick-btn" onclick="qp('Is there any unusual OI buildup? Where are large positions being built?')">🔍 Unusual OI</button>
+        <button class="quick-btn" onclick="qp('Which expiry should I focus on for weekly trading?')">📅 Best Expiry</button>
+      </div>
+      <div class="chart-card" style="padding:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">📊 Live Data Context</div>
+        <div id="aiCtx" style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;line-height:1.7;white-space:pre-wrap">Load data first...</div>
+      </div>
+    </div>
+  </div>
+</div><!-- /chatbot -->
+
+<!-- ════════ SETTINGS ════════ -->
+<div class="panel" id="panel-settings">
+  <div class="settings-wrap">
+
+    <!-- NSE Cookie -->
+    <div class="s-card">
+      <h3>🍪 NSE <span>Cookie Setup</span></h3>
+      <div class="alert a-warn">NSE requires a valid browser session cookie. Without it, the dashboard uses sample data. The cookie refreshes periodically — update it if data stops loading.</div>
+      <div class="f-row">
+        <label>NSE Cookie String</label>
+        <textarea id="sCookie" rows="4" placeholder="Paste full cookie string from NSE website...&#10;Example: _abck=...; bm_sz=...; nsit=...; nseappid=..."></textarea>
+        <div class="hint">📋 How to get: Open nseindia.com → F12 → Network tab → click any request → Request Headers → copy the entire <code>cookie</code> value</div>
+      </div>
+      <div class="f-row">
+        <label>CORS Proxy URL</label>
+        <input id="sProxy" value="https://api.allorigins.win/get?url=" placeholder="https://api.allorigins.win/get?url=">
+        <div class="hint">Required for browser. allorigins.win is free. Or self-host a proxy on Render/Vercel.</div>
+      </div>
+      <div class="f-row">
+        <label>Refresh Interval (seconds)</label>
+        <input id="sInterval" type="number" value="5" min="3" max="300">
+        <div class="hint">3–5s for live market hours. 30s+ when market closed.</div>
+      </div>
+      <button class="btn" onclick="saveCfg()">💾 Save & Apply</button>
+      <button class="btn-sm" style="margin-left:8px" onclick="testConn()">🔬 Test Connection</button>
+      <div id="cfgStatus" style="margin-top:10px"></div>
+    </div>
+
+    <!-- AI Config -->
+    <div class="s-card">
+      <h3>🤖 AI Chatbot <span>(Qwen API)</span></h3>
+      <div class="alert a-info">Get a free API key from <a href="https://openrouter.ai" target="_blank">openrouter.ai</a> — Qwen3-235B is available for FREE on OpenRouter.</div>
+      <div class="f-row">
+        <label>API Provider</label>
+        <select id="sProvider" onchange="onProviderChange()">
+          <option value="openrouter">OpenRouter (Recommended — Free Qwen)</option>
+          <option value="dashscope">Alibaba DashScope (Native Qwen)</option>
+        </select>
+      </div>
+      <div class="f-row">
+        <label>API Key</label>
+        <input id="sApiKey" type="password" placeholder="sk-or-v1-...">
+      </div>
+      <div class="f-row">
+        <label>Model</label>
+        <select id="sModel">
+          <option value="qwen/qwen3-235b-a22b:free">Qwen3-235B (Free)</option>
+          <option value="qwen/qwen-2.5-72b-instruct:free">Qwen2.5-72B (Free)</option>
+          <option value="qwen/qwen-2-7b-instruct:free">Qwen2-7B (Free)</option>
+          <option value="qwen-turbo">Qwen-Turbo (DashScope)</option>
+          <option value="qwen-plus">Qwen-Plus (DashScope)</option>
+        </select>
+      </div>
+      <button class="btn" onclick="saveAI()">💾 Save AI Config</button>
+      <button class="btn-sm" style="margin-left:8px" onclick="testAI()">🧪 Test AI</button>
+      <div id="aiStatus" style="margin-top:10px"></div>
+    </div>
+
+    <!-- GitHub Deploy -->
+    <div class="s-card">
+      <h3>🚀 <span>GitHub Pages Deploy</span></h3>
+      <div class="alert a-ok">✅ This is a single self-contained HTML file — no server needed. Deploy directly to GitHub Pages!</div>
+      <ol class="step-list">
+        <li>Download this file using the button below</li>
+        <li>Go to your GitHub repo: <code>maheshmaximusmax/Nifty-Dashboard</code></li>
+        <li>Upload / commit the file as <code>index.html</code> to the <code>main</code> branch</li>
+        <li>Go to repo Settings → Pages → Source: <b>main branch / root folder</b></li>
+        <li>Your live URL: <code>https://maheshmaximusmax.github.io/Nifty-Dashboard</code></li>
+        <li>Open the live site → Settings tab → paste NSE cookie → Save</li>
+        <li>Data refreshes every 5 seconds automatically!</li>
+      </ol>
+      <button class="btn" onclick="dlSelf()" style="margin-top:8px">⬇️ Download index.html</button>
+    </div>
+
+    <!-- Info -->
+    <div class="s-card">
+      <h3>📡 <span>Data & API Info</span></h3>
+      <div class="f-row">
+        <label>NSE API Endpoint</label>
+        <input id="sNSEUrl" value="https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY" readonly>
+      </div>
+      <div class="f-row">
+        <label>GitHub Repo</label>
+        <input value="https://github.com/maheshmaximusmax/Nifty-Dashboard" readonly>
+      </div>
+      <div class="f-row">
+        <label>Live Dashboard URL</label>
+        <input value="https://maheshmaximusmax.github.io/Nifty-Dashboard" readonly>
+      </div>
+      <p style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.6">
+        Data source: NSE India (nseindia.com) — Free, real-time option chain.<br>
+        Due to browser CORS policy, a proxy is required when accessing from browser.<br>
+        Market hours: Mon–Fri 9:15 AM – 3:30 PM IST.
+      </p>
+    </div>
+  </div>
+</div><!-- /settings -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const S = {
+  raw: null,       // {map, expiries, spot, timestamp}
+  filtered: [],    // rows for current expiry + range
+  expiries: [],
+  expiry: '',
+  symbol: 'NIFTY',
+  spot: 0,
+  atm: 0,
+  refreshTimer: null,
+  refreshSec: 5,
+  cookie: '',
+  proxy: 'https://api.allorigins.win/get?url=',
+  aiKey: '',
+  aiModel: 'qwen/qwen3-235b-a22b:free',
+  aiProvider: 'openrouter',
+  charts: {},
+  chatHist: []
+};
+
+// ═══════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  loadCfg();
+  initClock();
+  doFetch();
+});
+
+function loadCfg() {
+  const keys = ['cookie','proxy','refreshSec','aiKey','aiModel','aiProvider'];
+  keys.forEach(k => { const v = localStorage.getItem('noc2_'+k); if(v) S[k]=v; });
+  document.getElementById('sCookie').value   = S.cookie || '';
+  document.getElementById('sProxy').value    = S.proxy  || 'https://api.allorigins.win/get?url=';
+  document.getElementById('sInterval').value = S.refreshSec;
+  document.getElementById('sApiKey').value   = S.aiKey  || '';
+  document.getElementById('sModel').value    = S.aiModel;
+  document.getElementById('sProvider').value = S.aiProvider;
+}
+
+// ═══════════════════════════════════════════════
+//  CLOCK
+// ═══════════════════════════════════════════════
+function initClock() {
+  setInterval(() => {
+    const now = new Date();
+    document.getElementById('clockDisp').textContent = now.toLocaleTimeString('en-IN');
+    const h=now.getHours(), m=now.getMinutes();
+    const open = (h>9||(h===9&&m>=15)) && (h<15||(h===15&&m<=30));
+    const b = document.getElementById('mktBadge');
+    b.textContent = open ? 'OPEN' : 'CLOSED';
+    b.className = 'mkt-badge ' + (open?'open':'closed');
+  }, 1000);
+}
+
+// ═══════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════
+function switchTab(el, id) {
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-'+id).classList.add('active');
+  // lazy-render on switch
+  if (id==='nse')     renderNSE();
+  if (id==='chain')   renderChain();
+  if (id==='oi')      renderOI();
+  if (id==='maxpain') renderMaxPain();
+  if (id==='heatmap') renderHeatmap();
+  if (id==='charts')  renderChartsTab();
+}
+
+// ═══════════════════════════════════════════════
+//  FETCH
+// ═══════════════════════════════════════════════
+async function doFetch() {
+  busy(true);
+  const sym = document.getElementById('symSel').value;
+  S.symbol = sym;
+  const nseUrl = `https://www.nseindia.com/api/option-chain-indices?symbol=${sym}`;
+  document.getElementById('sNSEUrl').value = nseUrl;
+
+  let json = null;
+  // Try direct first (works if cookie set and CORS allowed)
+  try {
+    const headers = {};
+    if (S.cookie) {
+      headers['Cookie'] = S.cookie;
+      headers['User-Agent'] = 'Mozilla/5.0';
+      headers['Accept'] = '*/*';
+    }
+    const r = await fetchWithTimeout(nseUrl, { headers }, 6000);
+    if (r.ok) json = await r.json();
+  } catch(e) {}
+
+  // Try via proxy
+  if (!json && S.proxy) {
+    try {
+      const proxyUrl = S.proxy + encodeURIComponent(nseUrl);
+      const r = await fetchWithTimeout(proxyUrl, {}, 10000);
+      if (r.ok) {
+        const wrapper = await r.json();
+        const content = wrapper.contents || wrapper.body || wrapper;
+        json = typeof content === 'string' ? JSON.parse(content) : content;
+      }
+    } catch(e) {}
+  }
+
+  if (json && json.records && json.records.data) {
+    processData(json);
+    document.getElementById('fetchErrBar').style.display = 'none';
+  } else {
+    loadSample();
+    document.getElementById('fetchErrBar').style.display = 'block';
+  }
+
+  busy(false);
+  scheduleNext();
+}
+
+function fetchWithTimeout(url, opts, ms) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(id));
+}
+
+function busy(v) {
+  document.getElementById('loadSpin').style.display = v ? 'inline' : 'none';
+  if (!v) document.getElementById('lastUpd').textContent = '⏱ ' + new Date().toLocaleTimeString('en-IN');
+}
+
+function scheduleNext() {
+  if (S.refreshTimer) clearTimeout(S.refreshTimer);
+  const ms = (parseInt(S.refreshSec)||5) * 1000;
+  S.refreshTimer = setTimeout(doFetch, ms);
+}
+
+// ═══════════════════════════════════════════════
+//  PROCESS DATA
+// ═══════════════════════════════════════════════
+function processData(json) {
+  const rec = json.records;
+  S.spot = rec.underlyingValue || 0;
+  S.atm  = nearestATM(S.spot);
+
+  // topbar
+  document.getElementById('topSpot').textContent = n2(S.spot);
+  document.getElementById('topDate').textContent  = rec.timestamp || '';
+
+  // Build map: strike|expiry -> {CE,PE}
+  const map = {}, expSet = new Set();
+  rec.data.forEach(d => {
+    expSet.add(d.expiryDate);
+    const k = `${d.strikePrice}|${d.expiryDate}`;
+    if (!map[k]) map[k] = { strike:d.strikePrice, expiry:d.expiryDate, CE:null, PE:null };
+    if (d.CE) map[k].CE = d.CE;
+    if (d.PE) map[k].PE = d.PE;
+  });
+
+  S.expiries = [...expSet].sort((a,b) => parseExp(a)-parseExp(b));
+  S.raw = { map };
+
+  // Auto-select nearest expiry (current or next)
+  if (!S.expiry || !S.expiries.includes(S.expiry)) {
+    S.expiry = S.expiries[0] || '';
+  }
+
+  populateExpSelects();
+  applyFilter();
+  updateTopbar();
+  renderDashboard();
+}
+
+function nearestATM(spot) {
+  // NIFTY: 50, BANKNIFTY: 100, etc. Use 50 as default
+  const interval = spot > 40000 ? 100 : spot > 20000 ? 50 : 25;
+  return Math.round(spot / interval) * interval;
+}
+
+function parseExp(s) { try { return new Date(s.split('-').reverse().join('-')).getTime(); } catch(e) { return 0; } }
+
+function populateExpSelects() {
+  const ids = ['expSel','chainExpSel','mpExpSel','nseExpSel'];
+  ids.forEach(id => {
+    const el = document.getElementById(id); if(!el) return;
+    const prev = el.value;
+    el.innerHTML = S.expiries.map(e => `<option value="${e}"${e===S.expiry?'selected':''}>${e}</option>`).join('');
+    if (prev && S.expiries.includes(prev)) el.value = prev;
+  });
+
+  // Populate NSE strike select
+  const { map } = S.raw || {};
+  if (map) {
+    const strikes = [...new Set(Object.values(map).filter(r=>r.expiry===S.expiry).map(r=>r.strike))].sort((a,b)=>a-b);
+    document.getElementById('nseStrikeSel').innerHTML = '<option value="">Select</option>' +
+      strikes.map(s=>`<option value="${s}">${s}</option>`).join('');
+  }
+
+  renderExpBadges();
+}
+
+function renderExpBadges() {
+  const el = document.getElementById('expBadges');
+  el.innerHTML = S.expiries.slice(0,10).map((e,i) =>
+    `<div class="exp-badge${e===S.expiry?' active':''}" onclick="selectExp('${e}',this)">${e}</div>`
+  ).join('');
+}
+
+function selectExp(e, el) {
+  S.expiry = e;
+  document.querySelectorAll('.exp-badge').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  ['expSel','chainExpSel','mpExpSel','nseExpSel'].forEach(id => {
+    const sel = document.getElementById(id); if(sel) sel.value = e;
+  });
+  applyFilter();
+  renderDashboard();
+}
+
+function applyFilter() {
+  if (!S.raw) return;
+  const range = parseInt(document.getElementById('rangeSel').value) || 15;
+  const { map } = S.raw;
+  let rows = Object.values(map).filter(r => r.expiry === S.expiry);
+  rows.sort((a,b) => a.strike - b.strike);
+
+  if (range < 900) {
+    const strikes = rows.map(r=>r.strike);
+    const atmIdx  = strikes.findIndex(s => s >= S.atm);
+    const lo = strikes[Math.max(0, atmIdx - range)];
+    const hi = strikes[Math.min(strikes.length-1, atmIdx + range)];
+    rows = rows.filter(r => r.strike >= lo && r.strike <= hi);
+  }
+  S.filtered = rows;
+  updateAICtx();
+}
+
+// ═══════════════════════════════════════════════
+//  TOPBAR UPDATE
+// ═══════════════════════════════════════════════
+function updateTopbar() {
+  document.getElementById('topSpot').textContent = n2(S.spot);
+  document.getElementById('topChg').style.color = 'var(--green)';
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER DASHBOARD
+// ═══════════════════════════════════════════════
+function renderDashboard() {
+  const d = S.filtered; if (!d.length) return;
+
+  const ceOI  = d.reduce((s,r)=>s+(r.CE?.openInterest||0),0);
+  const peOI  = d.reduce((s,r)=>s+(r.PE?.openInterest||0),0);
+  const pcr   = ceOI ? peOI/ceOI : 0;
+  const mp    = maxPain(d);
+  const atmR  = d.reduce((p,c) => Math.abs(c.strike-S.atm)<Math.abs(p.strike-S.atm)?c:p, d[0]);
+  const ceBld = d.reduce((s,r)=>s+Math.max(0,r.CE?.changeinOpenInterest||0),0);
+  const peBld = d.reduce((s,r)=>s+Math.max(0,r.PE?.changeinOpenInterest||0),0);
+
+  setText('mSpot', n2(S.spot));
+  setText('mATM',  S.atm);
+  setText('mPCR',  pcr.toFixed(2));
+  setText('mCEOI', fmtOI(ceOI));
+  setText('mPEOI', fmtOI(peOI));
+  setText('mMP',   mp);
+  setText('mCEIV', (atmR?.CE?.impliedVolatility||0).toFixed(2)+'%');
+  setText('mPEIV', (atmR?.PE?.impliedVolatility||0).toFixed(2)+'%');
+  setText('mCEBuild', fmtOI(ceBld));
+  setText('mPEBuild', fmtOI(peBld));
+
+  const sent = pcr < 0.7 ? 'BEARISH' : pcr > 1.3 ? 'BULLISH' : 'NEUTRAL';
+  const sentCls = pcr < 0.7 ? 'bear-pill' : pcr > 1.3 ? 'bull-pill' : 'neut-pill';
+  setText('mPCRsub', sent);
+  setText('gPCR', pcr.toFixed(2));
+  setText('gSent', sent);
+  setClass('gSent', 'sentiment-pill ' + sentCls);
+  document.getElementById('gFill').style.width = Math.min(100, (pcr/2)*100) + '%';
+
+  // Top OI
+  const rows = [];
+  d.forEach(r => {
+    if (r.CE) rows.push({t:'CE',s:r.strike,oi:r.CE.openInterest||0,chg:r.CE.changeinOpenInterest||0,iv:r.CE.impliedVolatility||0,ltp:r.CE.lastPrice||0});
+    if (r.PE) rows.push({t:'PE',s:r.strike,oi:r.PE.openInterest||0,chg:r.PE.changeinOpenInterest||0,iv:r.PE.impliedVolatility||0,ltp:r.PE.lastPrice||0});
+  });
+  rows.sort((a,b)=>b.oi-a.oi);
+  document.getElementById('topOIbody').innerHTML = rows.slice(0,10).map(r=>`
+    <tr>
+      <td style="color:${r.t==='CE'?'var(--green)':'var(--red)'};font-weight:700">${r.t}</td>
+      <td style="font-weight:700;color:var(--accent)">${r.s}</td>
+      <td>${fmtOI(r.oi)}</td>
+      <td class="${r.chg>=0?'up-val':'dn-val'}">${fmtOI(r.chg)}</td>
+      <td class="iv-val">${r.iv.toFixed(1)}%</td>
+      <td>${r.ltp.toFixed(2)}</td>
+    </tr>`).join('');
+
+  drawCharts(d);
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW CHARTS
+// ═══════════════════════════════════════════════
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = '#1e2d47';
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 10;
+
+function mkC(id, type, data, opts={}) {
+  if (S.charts[id]) S.charts[id].destroy();
+  const el = document.getElementById(id);
+  if (!el) return;
+  S.charts[id] = new Chart(el, { type, data, options: { responsive:true, animation:{duration:300}, ...opts } });
+}
+
+const baseOpts = {
+  plugins:{ legend:{ position:'bottom', labels:{ padding:12, font:{size:10} } } },
+  scales:{ x:{grid:{color:'rgba(255,255,255,.03)'}}, y:{grid:{color:'rgba(255,255,255,.03)'}} }
+};
+
+function drawCharts(d) {
+  const L = d.map(r=>r.strike);
+  const ceOI = d.map(r=>r.CE?.openInterest||0);
+  const peOI = d.map(r=>r.PE?.openInterest||0);
+  const ceChg = d.map(r=>r.CE?.changeinOpenInterest||0);
+  const peChg = d.map(r=>r.PE?.changeinOpenInterest||0);
+  const ceIV  = d.map(r=>r.CE?.impliedVolatility||null);
+  const peIV  = d.map(r=>r.PE?.impliedVolatility||null);
+  const ceLTP = d.map(r=>r.CE?.lastPrice||null);
+  const peLTP = d.map(r=>r.PE?.lastPrice||null);
+
+  mkC('cOIbar','bar',{labels:L,datasets:[
+    {label:'CE OI',data:ceOI,backgroundColor:'rgba(34,197,94,.55)',borderColor:'#22c55e',borderWidth:1},
+    {label:'PE OI',data:peOI,backgroundColor:'rgba(239,68,68,.55)',borderColor:'#ef4444',borderWidth:1}
+  ]},baseOpts);
+
+  mkC('cIV','line',{labels:L,datasets:[
+    {label:'CE IV',data:ceIV,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.05)',tension:.4,pointRadius:2,spanGaps:true},
+    {label:'PE IV',data:peIV,borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.05)',tension:.4,pointRadius:2,spanGaps:true}
+  ]},baseOpts);
+
+  mkC('cChgOI','bar',{labels:L,datasets:[
+    {label:'CE ΔOI',data:ceChg,backgroundColor:ceChg.map(v=>v>=0?'rgba(34,197,94,.6)':'rgba(239,68,68,.4)'),borderRadius:2},
+    {label:'PE ΔOI',data:peChg,backgroundColor:peChg.map(v=>v>=0?'rgba(34,197,94,.4)':'rgba(239,68,68,.3)'),borderRadius:2}
+  ]},baseOpts);
+
+  mkC('cLTP','line',{labels:L,datasets:[
+    {label:'CE LTP',data:ceLTP,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.05)',tension:.4,pointRadius:2,spanGaps:true},
+    {label:'PE LTP',data:peLTP,borderColor:'#8b5cf6',backgroundColor:'rgba(139,92,246,.05)',tension:.4,pointRadius:2,spanGaps:true}
+  ]},baseOpts);
+}
+
+// ═══════════════════════════════════════════════
+//  NSE-STYLE TABLE
+// ═══════════════════════════════════════════════
+function renderNSE() {
+  if (!S.raw) return;
+  const exp = document.getElementById('nseExpSel').value || S.expiry;
+  const sf  = document.getElementById('nseStrikeSel').value;
+  const { map } = S.raw;
+
+  let rows = Object.values(map).filter(r => r.expiry === exp);
+  rows.sort((a,b) => a.strike - b.strike);
+  if (sf) rows = rows.filter(r => r.strike == sf);
+
+  const spot = S.spot;
+  document.getElementById('nseUnderlying').textContent = `${S.symbol} ${n2(spot)}`;
+  document.getElementById('nseAsOn').textContent = `As on ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} ${new Date().toLocaleTimeString('en-IN')} IST`;
+
+  const maxCEOI = Math.max(...rows.map(r=>r.CE?.openInterest||0));
+  const maxPEOI = Math.max(...rows.map(r=>r.PE?.openInterest||0));
+
+  document.getElementById('nseTbody').innerHTML = rows.map(r => {
+    const isATM = r.strike === S.atm;
+    const ce = r.CE || {}, pe = r.PE || {};
+    const n = v => v===undefined||v===null||v===''||v===0 ? '-' : (typeof v==='number'&&!Number.isInteger(v)?v.toFixed(2):v);
+    const niv = v => v&&v>0 ? `<span class="nse-iv">${v.toFixed(2)}</span>` : '-';
+    const chgCls = v => v>0?'nse-up':v<0?'nse-dn':'';
+    const chgN = v => v&&v!==0 ? `<span class="${chgCls(v)}">${v.toFixed(2)}</span>` : '-';
+    const dn = v => (!v||v===0) ? '-' : v;
+
+    return `<tr class="${isATM?'nse-atm':''}">
+      <td class="ce-td${isATM?' nse-atm':''}">${dn(ce.openInterest)}</td>
+      <td class="ce-td${isATM?' nse-atm':''}">${chgN(ce.changeinOpenInterest)}</td>
+      <td class="ce-td${isATM?' nse-atm':''}">${dn(ce.totalTradedVolume)}</td>
+      <td class="ce-td${isATM?' nse-atm':''}">${niv(ce.impliedVolatility)}</td>
+      <td class="ce-td${isATM?' nse-atm':''} nse-ltp">${n(ce.lastPrice)}</td>
+      <td class="ce-td${isATM?' nse-atm':''}">${chgN(ce.change)}</td>
+      <td class="ce-td${isATM?' nse-atm':''}">${dn(ce.totalBuyQuantity)}</td>
+      <td class="ce-td${isATM?' nse-atm':''}">${n(ce.bidprice)}</td>
+      <td class="ce-td${isATM?' nse-atm':''}">${n(ce.askPrice)}</td>
+      <td class="ce-td${isATM?' nse-atm':''}">${dn(ce.totalSellQuantity)}</td>
+      <td class="strike-td${isATM?' nse-atm':''}">${r.strike}${isATM?'<span style="display:inline-block;font-size:8px;background:#1d4ed8;color:#fff;padding:1px 4px;border-radius:3px;margin-left:3px">ATM</span>':''}</td>
+      <td class="pe-td${isATM?' nse-atm':''}">${dn(pe.totalBuyQuantity)}</td>
+      <td class="pe-td${isATM?' nse-atm':''}">${n(pe.bidprice)}</td>
+      <td class="pe-td${isATM?' nse-atm':''}">${n(pe.askPrice)}</td>
+      <td class="pe-td${isATM?' nse-atm':''}">${dn(pe.totalSellQuantity)}</td>
+      <td class="pe-td${isATM?' nse-atm':''}">${chgN(pe.change)}</td>
+      <td class="pe-td${isATM?' nse-atm':''} nse-ltp">${n(pe.lastPrice)}</td>
+      <td class="pe-td${isATM?' nse-atm':''}">${niv(pe.impliedVolatility)}</td>
+      <td class="pe-td${isATM?' nse-atm':''}">${dn(pe.totalTradedVolume)}</td>
+      <td class="pe-td${isATM?' nse-atm':''}">${chgN(pe.changeinOpenInterest)}</td>
+      <td class="pe-td${isATM?' nse-atm':''}">${dn(pe.openInterest)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function onNSESymChange() {
+  document.getElementById('symSel').value = document.getElementById('nseSymSel').value;
+  onSymChange();
+}
+function onNSEExpChange() {
+  S.expiry = document.getElementById('nseExpSel').value;
+  applyFilter();
+  renderNSE();
+}
+function onNSEStrikeChange() { renderNSE(); }
+
+// ═══════════════════════════════════════════════
+//  DARK CHAIN TABLE
+// ═══════════════════════════════════════════════
+function renderChain() {
+  if (!S.raw) return;
+  const exp   = document.getElementById('chainExpSel').value || S.expiry;
+  const range = parseInt(document.getElementById('chainRange').value) || 15;
+  const { map } = S.raw;
+  let rows = Object.values(map).filter(r=>r.expiry===exp);
+  rows.sort((a,b)=>a.strike-b.strike);
+  if (range < 900) {
+    const strikes = rows.map(r=>r.strike);
+    const ai = strikes.findIndex(s=>s>=S.atm);
+    const lo = strikes[Math.max(0,ai-range)];
+    const hi = strikes[Math.min(strikes.length-1,ai+range)];
+    rows = rows.filter(r=>r.strike>=lo&&r.strike<=hi);
+  }
+
+  document.getElementById('chainUnderlying').textContent = `Underlying: ${S.symbol} ${n2(S.spot)} · Expiry: ${exp} · ATM: ${S.atm}`;
+
+  const maxCE = Math.max(...rows.map(r=>r.CE?.openInterest||0));
+  const maxPE = Math.max(...rows.map(r=>r.PE?.openInterest||0));
+
+  const f  = v => (v===undefined||v===null||v==='')?'<span class="na-val">—</span>':(typeof v==='number'?v.toFixed(2):v);
+  const fo = v => (v===undefined||v===null)?'<span class="na-val">—</span>':fmtOI(v);
+  const fc = v => `<span class="${v>0?'up-val':v<0?'dn-val':'na-val'}">${f(v)}</span>`;
+
+  document.getElementById('darkChainBody').innerHTML = rows.map(r => {
+    const isATM = r.strike===S.atm;
+    const ce=r.CE||{}, pe=r.PE||{};
+    const cePct = maxCE?(ce.openInterest||0)/maxCE*100:0;
+    const pePct = maxPE?(pe.openInterest||0)/maxPE*100:0;
+    return `<tr class="${isATM?'atm-row':''}">
+      <td class="ce-td oi-cell"><div class="oi-bg oi-bg-ce" style="width:${cePct}%"></div><span class="oi-num">${fo(ce.openInterest)}</span></td>
+      <td class="ce-td">${fc(ce.changeinOpenInterest)}</td>
+      <td class="ce-td">${f(ce.pchangeinOpenInterest)}%</td>
+      <td class="ce-td vol-val">${fo(ce.totalTradedVolume)}</td>
+      <td class="ce-td iv-val">${ce.impliedVolatility?ce.impliedVolatility.toFixed(2)+'%':'—'}</td>
+      <td class="ce-td" style="font-weight:600">${f(ce.lastPrice)}</td>
+      <td class="ce-td">${fc(ce.change)}</td>
+      <td class="ce-td">${f(ce.bidprice)}</td>
+      <td class="ce-td">${f(ce.askPrice)}</td>
+      <td class="ce-td" style="border-right:1px solid rgba(59,130,246,.3)">${fo(ce.totalBuyQuantity)}</td>
+      <td class="strike-td">${r.strike}${isATM?'<span class="atm-tag">ATM</span>':r.strike>S.spot?'<span class="tag tag-otm">OTM</span>':'<span class="tag tag-itm">ITM</span>'}</td>
+      <td class="pe-td">${fo(pe.totalBuyQuantity)}</td>
+      <td class="pe-td">${f(pe.bidprice)}</td>
+      <td class="pe-td">${f(pe.askPrice)}</td>
+      <td class="pe-td">${fc(pe.change)}</td>
+      <td class="pe-td" style="font-weight:600">${f(pe.lastPrice)}</td>
+      <td class="pe-td iv-val">${pe.impliedVolatility?pe.impliedVolatility.toFixed(2)+'%':'—'}</td>
+      <td class="pe-td vol-val">${fo(pe.totalTradedVolume)}</td>
+      <td class="pe-td">${f(pe.pchangeinOpenInterest)}%</td>
+      <td class="pe-td">${fc(pe.changeinOpenInterest)}</td>
+      <td class="pe-td oi-cell"><div class="oi-bg oi-bg-pe" style="width:${pePct}%"></div><span class="oi-num">${fo(pe.openInterest)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+//  OI ANALYSIS
+// ═══════════════════════════════════════════════
+function renderOI() {
+  const d = S.filtered; if (!d.length) return;
+  const ceOI = d.reduce((s,r)=>s+(r.CE?.openInterest||0),0);
+  const peOI = d.reduce((s,r)=>s+(r.PE?.openInterest||0),0);
+  const pcr  = ceOI ? (peOI/ceOI).toFixed(2) : 0;
+  const ceBld= d.reduce((s,r)=>s+Math.max(0,r.CE?.changeinOpenInterest||0),0);
+  const peBld= d.reduce((s,r)=>s+Math.max(0,r.PE?.changeinOpenInterest||0),0);
+  const mp   = maxPain(d);
+
+  document.getElementById('oiMetrics').innerHTML = `
+    <div class="mc"><div class="mc-label">CE OI</div><div class="mc-value c-green">${fmtOI(ceOI)}</div></div>
+    <div class="mc"><div class="mc-label">PE OI</div><div class="mc-value c-red">${fmtOI(peOI)}</div></div>
+    <div class="mc"><div class="mc-label">PCR</div><div class="mc-value c-blue">${pcr}</div></div>
+    <div class="mc"><div class="mc-label">CE Buildup</div><div class="mc-value c-cyan">${fmtOI(ceBld)}</div></div>
+    <div class="mc"><div class="mc-label">PE Buildup</div><div class="mc-value c-purple">${fmtOI(peBld)}</div></div>
+    <div class="mc"><div class="mc-label">Max Pain</div><div class="mc-value c-orange">${mp}</div></div>`;
+
+  // PCR by expiry
+  if (S.raw) {
+    const exps = S.expiries.slice(0,6);
+    const pcrs = exps.map(exp => {
+      const rows = Object.values(S.raw.map).filter(r=>r.expiry===exp);
+      const c = rows.reduce((s,r)=>s+(r.CE?.openInterest||0),0);
+      const p = rows.reduce((s,r)=>s+(r.PE?.openInterest||0),0);
+      return c ? +(p/c).toFixed(2) : 0;
+    });
+    mkC('cPCRbyExp','bar',{labels:exps,datasets:[{label:'PCR',data:pcrs,backgroundColor:pcrs.map(v=>v>=1?'rgba(34,197,94,.6)':'rgba(239,68,68,.6)'),borderRadius:4}]},{
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'rgba(255,255,255,.03)'}},y:{grid:{color:'rgba(255,255,255,.03)'},suggestedMin:0,suggestedMax:2}}
+    });
+  }
+
+  const L = d.map(r=>r.strike);
+  mkC('cOIall','bar',{labels:L,datasets:[
+    {label:'CE OI',data:d.map(r=>r.CE?.openInterest||0),backgroundColor:'rgba(34,197,94,.55)',borderColor:'#22c55e',borderWidth:1},
+    {label:'PE OI',data:d.map(r=>r.PE?.openInterest||0),backgroundColor:'rgba(239,68,68,.55)',borderColor:'#ef4444',borderWidth:1}
+  ]},baseOpts);
+
+  // S&R
+  const maxPE_r = d.reduce((m,r)=>((r.PE?.openInterest||0)>(m.PE?.openInterest||0)?r:m),d[0]);
+  const maxCE_r = d.reduce((m,r)=>((r.CE?.openInterest||0)>(m.CE?.openInterest||0)?r:m),d[0]);
+  document.getElementById('srBody').innerHTML = `
+    <table class="top-oi-t" style="width:100%">
+      <thead><tr><th>Level</th><th>Strike</th><th>Type</th><th>OI</th><th>Interpretation</th></tr></thead>
+      <tbody>
+        <tr>
+          <td style="color:var(--green);font-weight:700">🛡 SUPPORT</td>
+          <td style="color:var(--green);font-weight:700">${maxPE_r?.strike||'—'}</td>
+          <td>PE Max OI</td>
+          <td>${fmtOI(maxPE_r?.PE?.openInterest)}</td>
+          <td style="text-align:left;color:var(--text2)">High PE writing = strong support. Market expected to stay above this level.</td>
+        </tr>
+        <tr>
+          <td style="color:var(--red);font-weight:700">⚔ RESISTANCE</td>
+          <td style="color:var(--red);font-weight:700">${maxCE_r?.strike||'—'}</td>
+          <td>CE Max OI</td>
+          <td>${fmtOI(maxCE_r?.CE?.openInterest)}</td>
+          <td style="text-align:left;color:var(--text2)">High CE writing = strong resistance. Market capped near this level.</td>
+        </tr>
+        <tr>
+          <td style="color:var(--orange);font-weight:700">🎯 MAX PAIN</td>
+          <td style="color:var(--orange);font-weight:700">${mp}</td>
+          <td>Combined OI</td>
+          <td>—</td>
+          <td style="text-align:left;color:var(--text2)">Price may gravitate toward max pain at expiry (minimizes option buyer payout).</td>
+        </tr>
+      </tbody>
+    </table>`;
+}
+
+// ═══════════════════════════════════════════════
+//  MAX PAIN
+// ═══════════════════════════════════════════════
+function maxPain(data) {
+  const strikes = data.map(r=>r.strike);
+  let minLoss=Infinity, mpS=0;
+  strikes.forEach(target => {
+    let loss = 0;
+    data.forEach(r => {
+      loss += Math.max(0, target-r.strike) * (r.CE?.openInterest||0);
+      loss += Math.max(0, r.strike-target) * (r.PE?.openInterest||0);
+    });
+    if (loss<minLoss) { minLoss=loss; mpS=target; }
+  });
+  return mpS;
+}
+
+function renderMaxPain() {
+  const exp = document.getElementById('mpExpSel')?.value || S.expiry;
+  if (!S.raw) return;
+  const rows = Object.values(S.raw.map).filter(r=>r.expiry===exp).sort((a,b)=>a.strike-b.strike);
+  if (!rows.length) return;
+
+  const mpData = [];
+  let minLoss=Infinity, mpS=0;
+  rows.forEach(target => {
+    let ceLoss=0, peLoss=0;
+    rows.forEach(r => {
+      ceLoss += Math.max(0, target.strike-r.strike) * (r.CE?.openInterest||0);
+      peLoss += Math.max(0, r.strike-target.strike) * (r.PE?.openInterest||0);
+    });
+    const total = ceLoss+peLoss;
+    mpData.push({strike:target.strike,ceLoss,peLoss,total,ceOI:target.CE?.openInterest||0,peOI:target.PE?.openInterest||0});
+    if (total<minLoss) { minLoss=total; mpS=target.strike; }
+  });
+
+  document.getElementById('mpChip').textContent = mpS;
+  if (document.getElementById('mMP')) document.getElementById('mMP').textContent = mpS;
+
+  mkC('cMP','line',{
+    labels:mpData.map(r=>r.strike),
+    datasets:[{
+      label:'Total Pain (₹ Cr)',
+      data:mpData.map(r=>r.total),
+      borderColor:'#f97316',
+      backgroundColor:'rgba(249,115,22,.08)',
+      tension:.4, fill:true,
+      pointBackgroundColor:mpData.map(r=>r.strike===mpS?'#f97316':'transparent'),
+      pointBorderColor:mpData.map(r=>r.strike===mpS?'#fff':'transparent'),
+      pointRadius:mpData.map(r=>r.strike===mpS?8:2)
+    }]
+  },{
+    plugins:{legend:{display:false}},
+    scales:{x:{grid:{color:'rgba(255,255,255,.03)'}},y:{grid:{color:'rgba(255,255,255,.03)'}}}
+  });
+
+  document.getElementById('mpTbody').innerHTML = mpData.map(r=>`
+    <tr class="${r.strike===mpS?'mp-highlight':''}">
+      <td>${r.strike}${r.strike===mpS?' 🎯':''}</td>
+      <td>${fmtOI(r.ceOI)}</td><td>${fmtOI(r.peOI)}</td>
+      <td>${fmtN(r.ceLoss)}</td><td>${fmtN(r.peLoss)}</td>
+      <td style="font-weight:700">${fmtN(r.total)}</td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════
+//  HEATMAP
+// ═══════════════════════════════════════════════
+function renderHeatmap() {
+  const d = S.filtered; if (!d.length) return;
+  const metric = document.getElementById('hmMetric').value;
+  const label = {'oi':'OI','iv':'IV%','ltp':'LTP','vol':'Volume','chgoi':'Chg OI'}[metric];
+
+  function getVal(r, side) {
+    const x = r[side];
+    if (!x) return 0;
+    return {oi:x.openInterest,iv:x.impliedVolatility,ltp:x.lastPrice,vol:x.totalTradedVolume,chgoi:Math.abs(x.changeinOpenInterest||0)}[metric]||0;
+  }
+  function color(val, max, side) {
+    const r = max?val/max:0;
+    const base = side==='CE'?[34,197,94]:[239,68,68];
+    return `rgba(${base[0]},${base[1]},${base[2]},${0.08+r*.75})`;
+  }
+  function fmtV(v) { if(!v)return'0'; if(v>=1e6)return(v/1e6).toFixed(1)+'M'; if(v>=1e3)return(v/1e3).toFixed(0)+'K'; return v.toFixed?v.toFixed(1):v; }
+
+  ['CE','PE'].forEach(side => {
+    const vals = d.map(r=>getVal(r,side));
+    const max  = Math.max(...vals);
+    const gridId = side==='CE'?'hmCE':'hmPE';
+    const titleId= side==='CE'?'hmCEtitle':'hmPEtitle';
+    document.getElementById(titleId).textContent = `📊 ${side} — ${label} Heatmap`;
+    document.getElementById(gridId).innerHTML = d.map((r,i)=>`
+      <div class="hm-cell" style="background:${color(vals[i],max,side)}" title="${side} ${r.strike}: ${label}=${vals[i]}">
+        <div class="hm-strike">${r.strike}</div>
+        <div class="hm-val">${fmtV(vals[i])}</div>
+      </div>`).join('');
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  CHARTS TAB
+// ═══════════════════════════════════════════════
+function renderChartsTab() {
+  const d = S.filtered; if (!d.length) return;
+  const L = d.map(r=>r.strike);
+  mkC('cVolCE','bar',{labels:L,datasets:[
+    {label:'CE Volume',data:d.map(r=>r.CE?.totalTradedVolume||0),backgroundColor:'rgba(34,197,94,.5)',borderRadius:3},
+    {label:'CE OI',   data:d.map(r=>r.CE?.openInterest||0),      backgroundColor:'rgba(6,182,212,.4)', borderRadius:3}
+  ]},baseOpts);
+  mkC('cVolPE','bar',{labels:L,datasets:[
+    {label:'PE Volume',data:d.map(r=>r.PE?.totalTradedVolume||0),backgroundColor:'rgba(139,92,246,.5)',borderRadius:3},
+    {label:'PE OI',   data:d.map(r=>r.PE?.openInterest||0),      backgroundColor:'rgba(239,68,68,.4)',  borderRadius:3}
+  ]},baseOpts);
+  mkC('cIVall','line',{labels:L,datasets:[
+    {label:'CE IV',data:d.map(r=>r.CE?.impliedVolatility||null),borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.06)',tension:.4,pointRadius:3,spanGaps:true},
+    {label:'PE IV',data:d.map(r=>r.PE?.impliedVolatility||null),borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.06)',tension:.4,pointRadius:3,spanGaps:true}
+  ]},baseOpts);
+}
+
+// ═══════════════════════════════════════════════
+//  AI CHAT
+// ═══════════════════════════════════════════════
+function updateAICtx() {
+  const d=S.filtered; if(!d.length){ document.getElementById('aiCtx').textContent='Load data first...'; return; }
+  const ceOI=d.reduce((s,r)=>s+(r.CE?.openInterest||0),0);
+  const peOI=d.reduce((s,r)=>s+(r.PE?.openInterest||0),0);
+  const pcr=(ceOI?peOI/ceOI:0).toFixed(2);
+  const mp=maxPain(d);
+  const atR=d.reduce((p,c)=>Math.abs(c.strike-S.atm)<Math.abs(p.strike-S.atm)?c:p,d[0]);
+  const txt=`Symbol: ${S.symbol} | Spot: ${n2(S.spot)} | ATM: ${S.atm}
+Expiry: ${S.expiry}
+Total CE OI: ${fmtOI(ceOI)} | Total PE OI: ${fmtOI(peOI)}
+PCR (OI): ${pcr} | Max Pain: ${mp}
+ATM CE IV: ${(atR?.CE?.impliedVolatility||0).toFixed(2)}% | ATM PE IV: ${(atR?.PE?.impliedVolatility||0).toFixed(2)}%
+ATM CE LTP: ${(atR?.CE?.lastPrice||0).toFixed(2)} | ATM PE LTP: ${(atR?.PE?.lastPrice||0).toFixed(2)}
+Top CE OI Strike: ${d.reduce((m,r)=>((r.CE?.openInterest||0)>(m.CE?.openInterest||0)?r:m),d[0]).strike}
+Top PE OI Strike: ${d.reduce((m,r)=>((r.PE?.openInterest||0)>(m.PE?.openInterest||0)?r:m),d[0]).strike}`;
+  document.getElementById('aiCtx').textContent = txt;
+}
+
+async function sendChat() {
+  const inp=document.getElementById('chatIn');
+  const msg=inp.value.trim(); if(!msg) return;
+  inp.value='';
+  addMsg('user',msg);
+  const think=showThinking();
+  const ctx=document.getElementById('aiCtx').textContent;
+  S.chatHist.push({role:'user',content:`Option chain context:\n${ctx}\n\nQuestion: ${msg}`});
+  try {
+    const reply=await callQwen(S.chatHist);
+    removeThinking(think);
+    addMsg('ai',reply);
+    S.chatHist.push({role:'assistant',content:reply});
+  } catch(e) {
+    removeThinking(think);
+    addMsg('ai','❌ '+e.message+'\n\nPlease configure your API key in Settings → AI Chatbot.');
+  }
+}
+
+function qp(p){ document.getElementById('chatIn').value=p; sendChat(); }
+function clearChat(){ S.chatHist=[]; document.getElementById('chatWin').innerHTML='<div class="msg msg-ai"><div class="msg-label">AI ASSISTANT</div><div class="msg-bubble">Chat cleared. Ask me anything about NIFTY options!</div></div>'; }
+
+function addMsg(role,text) {
+  const win=document.getElementById('chatWin');
+  const d=document.createElement('div');
+  d.className='msg msg-'+role;
+  d.innerHTML=`<div class="msg-label">${role==='user'?'YOU':'AI ASSISTANT (QWEN)'}</div><div class="msg-bubble">${text.replace(/</g,'&lt;')}</div>`;
+  win.appendChild(d);
+  win.scrollTop=win.scrollHeight;
+}
+
+function showThinking() {
+  const win=document.getElementById('chatWin');
+  const d=document.createElement('div');
+  d.id='thinkEl';
+  d.className='msg msg-ai';
+  d.innerHTML='<div class="thinking"><div class="d1"></div><div class="d2"></div><div class="d3"></div></div>';
+  win.appendChild(d);
+  win.scrollTop=win.scrollHeight;
+  return d;
+}
+function removeThinking(el){ el?.remove(); }
+
+async function callQwen(hist) {
+  const key=S.aiKey; if(!key) throw new Error('API key not set. Go to Settings → AI Chatbot.');
+  const sys='You are an expert Indian stock market analyst specializing in NIFTY options. Provide concise, actionable insights using the option chain data provided. Use ₹ for currency. Reference PCR, OI, IV, Max Pain in your analysis.';
+  let endpoint, headers;
+  if (S.aiProvider==='dashscope') {
+    endpoint='https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation';
+    headers={'Content-Type':'application/json','Authorization':'Bearer '+key};
+    const body={model:S.aiModel.replace(':free',''),input:{messages:[{role:'system',content:sys},...hist.slice(-6)]},parameters:{result_format:'message',max_tokens:600}};
+    const r=await fetch(endpoint,{method:'POST',headers,body:JSON.stringify(body)});
+    if(!r.ok){const e=await r.json();throw new Error(e.message||'DashScope error');}
+    const data=await r.json();
+    return data.output?.choices?.[0]?.message?.content||'No response';
+  } else {
+    endpoint='https://openrouter.ai/api/v1/chat/completions';
+    headers={'Content-Type':'application/json','Authorization':'Bearer '+key,'HTTP-Referer':'https://maheshmaximusmax.github.io/Nifty-Dashboard','X-Title':'NIFTY Option Dashboard'};
+    const body={model:S.aiModel,messages:[{role:'system',content:sys},...hist.slice(-6)],max_tokens:600,temperature:0.7};
+    const r=await fetch(endpoint,{method:'POST',headers,body:JSON.stringify(body)});
+    if(!r.ok){const e=await r.json().catch(()=>({error:{message:'HTTP '+r.status}}));throw new Error(e.error?.message||'OpenRouter error '+r.status);}
+    const data=await r.json();
+    return data.choices?.[0]?.message?.content||'No response';
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════
+function saveCfg() {
+  S.cookie     = document.getElementById('sCookie').value.trim();
+  S.proxy      = document.getElementById('sProxy').value.trim();
+  S.refreshSec = document.getElementById('sInterval').value;
+  ['cookie','proxy','refreshSec'].forEach(k=>localStorage.setItem('noc2_'+k, S[k]));
+  showSt('cfgStatus','ok','✅ Saved! Reconnecting...');
+  doFetch();
+}
+
+async function testConn() {
+  showSt('cfgStatus','info','🔄 Testing...');
+  await doFetch();
+  if (S.raw) showSt('cfgStatus','ok','✅ Connected! Data loaded.');
+  else       showSt('cfgStatus','err','❌ Could not get live data. Check cookie/proxy.');
+}
+
+function saveAI() {
+  S.aiKey      = document.getElementById('sApiKey').value.trim();
+  S.aiModel    = document.getElementById('sModel').value;
+  S.aiProvider = document.getElementById('sProvider').value;
+  ['aiKey','aiModel','aiProvider'].forEach(k=>localStorage.setItem('noc2_'+k,S[k]));
+  showSt('aiStatus','ok','✅ AI settings saved!');
+}
+
+async function testAI() {
+  showSt('aiStatus','info','🧪 Testing AI...');
+  try {
+    const r=await callQwen([{role:'user',content:'Reply with exactly: "NIFTY AI connected!"'}]);
+    showSt('aiStatus','ok','✅ AI works: '+r.slice(0,60));
+  } catch(e){ showSt('aiStatus','err','❌ '+e.message); }
+}
+
+function onProviderChange() {
+  const p=document.getElementById('sProvider').value;
+  if(p==='openrouter'){
+    document.getElementById('sModel').innerHTML=`
+      <option value="qwen/qwen3-235b-a22b:free">Qwen3-235B (Free)</option>
+      <option value="qwen/qwen-2.5-72b-instruct:free">Qwen2.5-72B (Free)</option>
+      <option value="qwen/qwen-2-7b-instruct:free">Qwen2-7B (Free)</option>`;
+  } else {
+    document.getElementById('sModel').innerHTML=`
+      <option value="qwen-turbo">Qwen-Turbo</option>
+      <option value="qwen-plus">Qwen-Plus</option>
+      <option value="qwen-max">Qwen-Max</option>`;
+  }
+}
+
+function showSt(id,type,msg) {
+  const cls={ok:'a-ok',err:'a-err',info:'a-info',warn:'a-warn'}[type];
+  document.getElementById(id).innerHTML=`<div class="alert ${cls}">${msg}</div>`;
+  if(type==='ok') setTimeout(()=>{ const el=document.getElementById(id); if(el)el.innerHTML=''; },5000);
+}
+
+// ═══════════════════════════════════════════════
+//  SAMPLE DATA
+// ═══════════════════════════════════════════════
+function loadSample() {
+  const spot=24576.60, today=new Date();
+  S.spot=spot; S.atm=nearestATM(spot);
+  // Generate a set of realistic expiries starting from today
+  const expiries=[];
+  const d=new Date(today);
+  for(let i=0;i<8;i++){
+    // Next Thursday
+    while(d.getDay()!==4) d.setDate(d.getDate()+1);
+    expiries.push(d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-'));
+    d.setDate(d.getDate()+1);
+  }
+  S.expiries=expiries;
+
+  const strikes=[];
+  for(let s=S.atm-2000;s<=S.atm+2000;s+=50) strikes.push(s);
+
+  const map={};
+  expiries.forEach((exp,ei)=>{
+    const decay=1/(1+ei*0.3);
+    strikes.forEach(st=>{
+      const moneyness=(st-spot)/spot;
+      const ceOI=Math.round(Math.max(0,5000-Math.abs(moneyness)*50000+Math.random()*2000)*decay);
+      const peOI=Math.round(Math.max(0,5000+Math.abs(Math.min(0,moneyness))*80000+Math.random()*2000)*decay);
+      const ceIV=15+Math.abs(moneyness)*120+Math.random()*2;
+      const peIV=17+Math.abs(moneyness)*100+Math.random()*2;
+      const ceLTP=Math.max(0.05,(spot-st<0?0:spot-st)+Math.random()*10+ceIV*0.5);
+      const peLTP=Math.max(0.05,(st-spot<0?0:st-spot)+Math.random()*10+peIV*0.5);
+      const k=`${st}|${exp}`;
+      map[k]={strike:st,expiry:exp,
+        CE:{openInterest:ceOI,changeinOpenInterest:Math.round((Math.random()-.45)*ceOI*.2),pchangeinOpenInterest:(Math.random()-.45)*15,totalTradedVolume:Math.round(ceOI*(0.1+Math.random()*.3)),impliedVolatility:ceIV,lastPrice:ceLTP,change:(Math.random()-.5)*ceLTP*.1,pChange:(Math.random()-.5)*5,totalBuyQuantity:Math.round(Math.random()*1000)*75,totalSellQuantity:Math.round(Math.random()*1000)*75,bidprice:ceLTP-.5,askPrice:ceLTP+.5,underlyingValue:spot},
+        PE:{openInterest:peOI,changeinOpenInterest:Math.round((Math.random()-.45)*peOI*.2),pchangeinOpenInterest:(Math.random()-.45)*15,totalTradedVolume:Math.round(peOI*(0.1+Math.random()*.3)),impliedVolatility:peIV,lastPrice:peLTP,change:(Math.random()-.5)*peLTP*.1,pChange:(Math.random()-.5)*5,totalBuyQuantity:Math.round(Math.random()*1000)*75,totalSellQuantity:Math.round(Math.random()*1000)*75,bidprice:peLTP-.5,askPrice:peLTP+.5,underlyingValue:spot}
+      };
+    });
+  });
+
+  S.raw={map};
+  S.expiry=expiries[0];
+  document.getElementById('topSpot').textContent=n2(spot);
+  document.getElementById('topDate').textContent='Sample Data';
+  populateExpSelects();
+  applyFilter();
+  renderDashboard();
+}
+
+// ═══════════════════════════════════════════════
+//  CSV DOWNLOAD
+// ═══════════════════════════════════════════════
+function downloadCSV() {
+  const d=S.filtered; if(!d.length) return;
+  const hdr='Strike,CE_OI,CE_ChgOI,CE_Vol,CE_IV,CE_LTP,CE_Bid,CE_Ask,PE_OI,PE_ChgOI,PE_Vol,PE_IV,PE_LTP,PE_Bid,PE_Ask';
+  const rows=d.map(r=>{
+    const c=r.CE||{},p=r.PE||{};
+    return [r.strike,c.openInterest||'',c.changeinOpenInterest||'',c.totalTradedVolume||'',c.impliedVolatility||'',c.lastPrice||'',c.bidprice||'',c.askPrice||'',
+      p.openInterest||'',p.changeinOpenInterest||'',p.totalTradedVolume||'',p.impliedVolatility||'',p.lastPrice||'',p.bidprice||'',p.askPrice||''].join(',');
+  });
+  const csv='data:text/csv;charset=utf-8,'+encodeURIComponent([hdr,...rows].join('\n'));
+  const a=document.createElement('a');
+  a.href=csv; a.download=`NIFTY_OC_${S.expiry}_${Date.now()}.csv`; a.click();
+}
+
+function dlSelf() {
+  const html=document.documentElement.outerHTML;
+  const blob=new Blob([html],{type:'text/html'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='index.html'; a.click();
+}
+
+// ═══════════════════════════════════════════════
+//  SYMBOL / EXPIRY CHANGE HANDLERS
+// ═══════════════════════════════════════════════
+function onSymChange() {
+  S.symbol=document.getElementById('symSel').value;
+  doFetch();
+}
+function onExpChange() {
+  S.expiry=document.getElementById('expSel').value;
+  applyFilter();
+  renderDashboard();
+}
+
+// ═══════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════
+function n2(v)    { return v?v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'; }
+function fmtOI(v) { if(!v&&v!==0)return'—'; v=+v; if(Math.abs(v)>=1e6)return(v/1e6).toFixed(2)+'M'; if(Math.abs(v)>=1e3)return(v/1e3).toFixed(1)+'K'; return Math.round(v); }
+function fmtN(v)  { if(!v)return'—'; v=+v; if(v>=1e9)return(v/1e9).toFixed(2)+'B'; if(v>=1e6)return(v/1e6).toFixed(2)+'M'; if(v>=1e3)return(v/1e3).toFixed(1)+'K'; return Math.round(v); }
+function setText(id,v)  { const e=document.getElementById(id); if(e)e.textContent=v; }
+function setClass(id,c) { const e=document.getElementById(id); if(e)e.className=c; }
+</script>
+</body>
+</html>
