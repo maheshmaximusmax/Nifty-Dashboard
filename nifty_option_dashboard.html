@@ -1,0 +1,1820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NIFTY Option Chain — Live Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0d14;
+    --bg2: #111520;
+    --bg3: #171c28;
+    --border: #1e2535;
+    --border2: #2a3349;
+    --text: #e2e8f4;
+    --text2: #8892aa;
+    --text3: #4d5a73;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --green: #00e676;
+    --red: #ff4457;
+    --orange: #ff9500;
+    --yellow: #ffd60a;
+    --cyan: #00bcd4;
+    --card: #131825;
+    --card2: #0f1420;
+    --radius: 12px;
+    --radius2: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-size: 18px; font-weight: 800; letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(0,230,118,0.1); border: 1px solid rgba(0,230,118,0.3);
+    border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--green);
+    font-family: 'JetBrains Mono', monospace; font-weight: 600;
+  }
+  .live-dot {
+    width: 7px; height: 7px; background: var(--green); border-radius: 50%;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+
+  #clock {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; color: var(--text2);
+  }
+  .mkt-status {
+    font-size: 11px; font-family: 'JetBrains Mono', monospace;
+    padding: 3px 8px; border-radius: 4px; font-weight: 600;
+  }
+  .mkt-open  { background: rgba(0,230,118,.15); color: var(--green); border: 1px solid rgba(0,230,118,.3); }
+  .mkt-close { background: rgba(255,68,87,.15);  color: var(--red);   border: 1px solid rgba(255,68,87,.3); }
+
+  /* ── TABS ── */
+  .tab-bar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex; overflow-x: auto; padding: 0 16px;
+    scrollbar-width: none;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+  .tab {
+    padding: 14px 20px; cursor: pointer; white-space: nowrap;
+    font-size: 13px; font-weight: 600; color: var(--text3);
+    border-bottom: 2px solid transparent; transition: .2s;
+    display: flex; align-items: center; gap: 7px; letter-spacing: .3px;
+  }
+  .tab:hover { color: var(--text2); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-icon { font-size: 15px; }
+
+  /* ── PANELS ── */
+  .panel { display: none; padding: 20px; }
+  .panel.active { display: block; }
+
+  /* ── CONTROLS ── */
+  .controls-bar {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px;
+  }
+  select, input {
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--text); border-radius: var(--radius2); padding: 7px 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; outline: none;
+    cursor: pointer;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+  label { font-size: 12px; color: var(--text2); font-weight: 600; }
+  .btn {
+    background: linear-gradient(135deg, var(--accent), #0095cc);
+    color: #000; border: none; border-radius: var(--radius2);
+    padding: 8px 18px; font-weight: 700; font-size: 12px;
+    cursor: pointer; letter-spacing: .5px; transition: .2s;
+  }
+  .btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+  .btn-outline {
+    background: transparent; color: var(--accent);
+    border: 1px solid var(--accent); border-radius: var(--radius2);
+    padding: 7px 16px; font-weight: 600; font-size: 12px; cursor: pointer; transition: .2s;
+  }
+  .btn-outline:hover { background: rgba(0,212,255,.1); }
+  .btn-red {
+    background: linear-gradient(135deg, var(--red), #cc1a2a);
+    color: #fff; border: none; border-radius: var(--radius2);
+    padding: 7px 14px; font-weight: 700; font-size: 12px; cursor: pointer;
+  }
+
+  /* ── METRIC CARDS ── */
+  .metrics-row {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+  }
+  .metric-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+    transition: border-color .2s;
+  }
+  .metric-card:hover { border-color: var(--border2); }
+  .metric-label { font-size: 11px; color: var(--text3); font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+  .metric-value { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; }
+  .metric-sub { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+  .neutral { color: var(--accent); }
+
+  /* ── MAIN GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media(max-width:900px) { .grid-2,.grid-3 { grid-template-columns:1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .card-header {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-title { font-size: 13px; font-weight: 700; letter-spacing: .3px; }
+  .card-body { padding: 16px; }
+
+  /* ── OPTION CHAIN TABLE ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  th {
+    background: var(--bg3); color: var(--text2);
+    padding: 9px 8px; text-align: right; font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+    position: sticky; top: 0; z-index: 2;
+  }
+  th.center, td.center { text-align: center; }
+  th.strike-col { background: var(--bg2); color: var(--accent); }
+  td {
+    padding: 7px 8px; text-align: right; border-bottom: 1px solid rgba(30,37,53,.5);
+    font-family: 'JetBrains Mono', monospace; white-space: nowrap;
+    transition: background .1s;
+  }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  td.strike-cell {
+    background: rgba(0,212,255,.06); color: var(--accent);
+    font-weight: 700; font-size: 12px; text-align: center;
+    position: sticky; /* not sticky in all browsers but helps */
+  }
+  td.atm-strike-cell {
+    background: rgba(0,212,255,.18) !important; color: #fff !important;
+    font-weight: 800 !important;
+  }
+  tr.atm-row td { background: rgba(0,212,255,.05); }
+  .ce-bg { background: rgba(0,230,118,.03); }
+  .pe-bg { background: rgba(255,68,87,.03); }
+  .oi-bar-cell { position: relative; }
+  .oi-bar {
+    position: absolute; top: 2px; bottom: 2px; left: 0;
+    border-radius: 2px; opacity: .35; pointer-events: none;
+  }
+  .oi-bar.ce { background: var(--green); right: auto; left: 0; }
+  .oi-bar.pe { background: var(--red);   right: auto; left: 0; }
+  .change-up   { color: var(--green); }
+  .change-down { color: var(--red); }
+  .iv-cell { color: var(--orange); }
+  .tag {
+    display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .5px;
+    padding: 1px 5px; border-radius: 3px; margin-left: 4px;
+  }
+  .tag-atm { background: rgba(0,212,255,.2); color: var(--accent); }
+  .tag-itm { background: rgba(0,230,118,.15); color: var(--green); }
+  .tag-otm { background: rgba(255,68,87,.12); color: var(--red); }
+
+  /* ── CHART CANVAS ── */
+  .chart-container { position: relative; width: 100%; }
+  canvas { width: 100% !important; max-height: 260px; }
+
+  /* ── PCR / SENTIMENT ── */
+  .pcr-gauge {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; padding: 12px 0;
+  }
+  .gauge-track {
+    width: 100%; height: 16px; background: var(--bg3);
+    border-radius: 8px; overflow: hidden; position: relative;
+  }
+  .gauge-fill {
+    height: 100%; border-radius: 8px; transition: width .6s ease;
+    background: linear-gradient(90deg, var(--red), var(--orange), var(--green));
+  }
+  .gauge-labels { display: flex; justify-content: space-between; width: 100%; font-size: 10px; color: var(--text3); }
+  .gauge-value { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700; }
+  .sentiment-badge {
+    font-size: 12px; font-weight: 700; padding: 4px 12px;
+    border-radius: 20px; letter-spacing: .5px;
+  }
+  .bull { background: rgba(0,230,118,.15); color: var(--green); border: 1px solid rgba(0,230,118,.3); }
+  .bear { background: rgba(255,68,87,.15);  color: var(--red);   border: 1px solid rgba(255,68,87,.3); }
+  .neut { background: rgba(255,149,0,.15);  color: var(--orange);border: 1px solid rgba(255,149,0,.3); }
+
+  /* ── MAX PAIN ── */
+  .maxpain-row {
+    display: flex; align-items: center; gap: 16px; padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .maxpain-label { font-size: 11px; color: var(--text2); width: 120px; flex-shrink: 0; }
+  .maxpain-val { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; }
+  .bar-track { flex: 1; height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width .5s; }
+
+  /* ── OI ANALYSIS ── */
+  .oi-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .oi-box {
+    background: var(--bg3); border-radius: var(--radius2); padding: 12px;
+    text-align: center;
+  }
+  .oi-box .val { font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .oi-box .lbl { font-size: 10px; color: var(--text3); margin-top: 2px; letter-spacing: .5px; }
+
+  /* ── COOKIE / SETTINGS ── */
+  .settings-section {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+  }
+  .settings-section h3 { font-size: 14px; font-weight: 700; margin-bottom: 14px; color: var(--text); }
+  .settings-section h3 span { color: var(--accent); }
+  .form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .form-row label { font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: .3px; }
+  .form-row input, .form-row textarea, .form-row select {
+    width: 100%; padding: 9px 12px; font-size: 12px;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: var(--radius2); color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .form-row textarea { resize: vertical; min-height: 80px; }
+  .form-row input:focus, .form-row textarea:focus { border-color: var(--accent); outline: none; }
+  .hint { font-size: 10px; color: var(--text3); margin-top: 3px; }
+  .alert {
+    padding: 10px 14px; border-radius: var(--radius2); font-size: 12px;
+    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .alert-info { background: rgba(0,212,255,.1); border: 1px solid rgba(0,212,255,.2); color: var(--accent); }
+  .alert-warn { background: rgba(255,149,0,.1); border: 1px solid rgba(255,149,0,.25); color: var(--orange); }
+  .alert-err  { background: rgba(255,68,87,.1);  border: 1px solid rgba(255,68,87,.25);  color: var(--red); }
+  .alert-ok   { background: rgba(0,230,118,.1);  border: 1px solid rgba(0,230,118,.25);  color: var(--green); }
+
+  /* ── CHATBOT ── */
+  .chat-window {
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: var(--radius); height: 420px; overflow-y: auto;
+    padding: 16px; display: flex; flex-direction: column; gap: 12px;
+    margin-bottom: 12px; scroll-behavior: smooth;
+  }
+  .chat-window::-webkit-scrollbar { width: 4px; }
+  .chat-window::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .msg {
+    max-width: 80%; padding: 10px 14px; border-radius: 12px;
+    font-size: 13px; line-height: 1.55;
+  }
+  .msg-user {
+    background: linear-gradient(135deg, var(--accent2), #4f1fb3);
+    color: #fff; align-self: flex-end; border-bottom-right-radius: 3px;
+  }
+  .msg-ai {
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--text); align-self: flex-start; border-bottom-left-radius: 3px;
+  }
+  .msg-label { font-size: 10px; color: var(--text3); margin-bottom: 3px; font-weight: 600; }
+  .chat-input-row { display: flex; gap: 10px; }
+  .chat-input-row input {
+    flex: 1; padding: 11px 14px; font-size: 13px;
+    font-family: 'Syne', sans-serif;
+  }
+  .chat-thinking {
+    display: flex; gap: 5px; align-items: center; padding: 10px 14px;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 12px; border-bottom-left-radius: 3px;
+    align-self: flex-start;
+  }
+  .dot1,.dot2,.dot3 {
+    width: 7px; height: 7px; background: var(--text3); border-radius: 50%;
+    animation: bounce .9s infinite;
+  }
+  .dot2{animation-delay:.15s} .dot3{animation-delay:.3s}
+  @keyframes bounce {0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
+
+  /* ── SPINNER ── */
+  .spinner {
+    display: inline-block; width: 20px; height: 20px;
+    border: 2px solid var(--border2); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* ── RESPONSIVE ── */
+  @media(max-width:600px){
+    .metrics-row { grid-template-columns: repeat(2,1fr); }
+    .panel { padding: 12px; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .chat-window { height: 300px; }
+  }
+
+  /* ── MINI BADGE ── */
+  .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .badge {
+    font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace; cursor: pointer; transition: .2s;
+  }
+  .badge-exp { background: rgba(124,58,237,.2); color: #a78bfa; border: 1px solid rgba(124,58,237,.3); }
+  .badge-exp.active, .badge-exp:hover { background: rgba(124,58,237,.4); }
+
+  /* ── ERROR BOX ── */
+  #fetchError { display: none; }
+  .fetch-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── HEATMAP ── */
+  .heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 4px; padding: 4px;
+  }
+  .hm-cell {
+    border-radius: 6px; padding: 8px 4px; text-align: center; cursor: pointer;
+    transition: transform .15s; font-family: 'JetBrains Mono', monospace;
+  }
+  .hm-cell:hover { transform: scale(1.05); z-index: 1; }
+  .hm-cell .hm-strike { font-size: 10px; color: rgba(255,255,255,.5); }
+  .hm-cell .hm-val   { font-size: 12px; font-weight: 700; color: #fff; }
+
+  /* ── LAST UPDATED ── */
+  #lastUpdated { font-size: 10px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡ NIFTY OPTION PRO</div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    <div id="mktStatus" class="mkt-status mkt-close">MARKET CLOSED</div>
+    <div id="clock">--:--:--</div>
+  </div>
+</header>
+
+<div class="tab-bar">
+  <div class="tab active" onclick="showTab('dashboard')"   data-tab="dashboard">   <span class="tab-icon">📊</span>Option Dashboard</div>
+  <div class="tab"         onclick="showTab('chain')"       data-tab="chain">       <span class="tab-icon">🔗</span>Option Chain</div>
+  <div class="tab"         onclick="showTab('oi')"          data-tab="oi">          <span class="tab-icon">📈</span>OI Analysis</div>
+  <div class="tab"         onclick="showTab('charts')"      data-tab="charts">      <span class="tab-icon">🕯️</span>Charts</div>
+  <div class="tab"         onclick="showTab('maxpain')"     data-tab="maxpain">     <span class="tab-icon">💀</span>Max Pain</div>
+  <div class="tab"         onclick="showTab('heatmap')"     data-tab="heatmap">     <span class="tab-icon">🌡️</span>OI Heatmap</div>
+  <div class="tab"         onclick="showTab('chatbot')"     data-tab="chatbot">     <span class="tab-icon">🤖</span>AI Assistant</div>
+  <div class="tab"         onclick="showTab('settings')"    data-tab="settings">    <span class="tab-icon">⚙️</span>Admin / Settings</div>
+</div>
+
+<!-- ═══════════════════════════════ DASHBOARD ═══════════════════════════════ -->
+<div id="tab-dashboard" class="panel active">
+
+  <div class="controls-bar">
+    <div>
+      <label>Symbol</label>
+      <select id="symbolSel" onchange="onSymbolChange()">
+        <option value="NIFTY">NIFTY</option>
+        <option value="BANKNIFTY">BANKNIFTY</option>
+        <option value="FINNIFTY">FINNIFTY</option>
+        <option value="MIDCPNIFTY">MIDCPNIFTY</option>
+      </select>
+    </div>
+    <div>
+      <label>Expiry</label>
+      <select id="expirySel" onchange="filterChain()"></select>
+    </div>
+    <div>
+      <label>ATM ± Strikes</label>
+      <select id="strikeRangeSel" onchange="filterChain()">
+        <option value="10">10</option>
+        <option value="15" selected>15</option>
+        <option value="20">20</option>
+        <option value="all">All</option>
+      </select>
+    </div>
+    <button class="btn" onclick="fetchOptionChain()">🔄 Refresh</button>
+    <div class="fetch-status">
+      <span id="fetchSpinner" style="display:none"><span class="spinner"></span></span>
+      <span id="lastUpdated">Not loaded</span>
+    </div>
+  </div>
+
+  <!-- Metric cards -->
+  <div class="metrics-row" id="metricsRow">
+    <div class="metric-card">
+      <div class="metric-label">NIFTY Spot</div>
+      <div class="metric-value neutral" id="spotPrice">—</div>
+      <div class="metric-sub" id="spotChg">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">ATM Strike</div>
+      <div class="metric-value" id="atmStrike">—</div>
+      <div class="metric-sub">Nearest Strike</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">PCR (OI)</div>
+      <div class="metric-value" id="pcrOI">—</div>
+      <div class="metric-sub" id="pcrSentiment">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Total CE OI</div>
+      <div class="metric-value up" id="totalCEOI">—</div>
+      <div class="metric-sub">Calls</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Total PE OI</div>
+      <div class="metric-value down" id="totalPEOI">—</div>
+      <div class="metric-sub">Puts</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Max Pain</div>
+      <div class="metric-value" id="maxPainVal" style="color:var(--orange)">—</div>
+      <div class="metric-sub">Strike</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">CE IV (ATM)</div>
+      <div class="metric-value" id="ceIV" style="color:var(--orange)">—</div>
+      <div class="metric-sub">Implied Vol</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">PE IV (ATM)</div>
+      <div class="metric-value" id="peIV" style="color:var(--orange)">—</div>
+      <div class="metric-sub">Implied Vol</div>
+    </div>
+  </div>
+
+  <!-- Expiry badges -->
+  <div class="badge-row" id="expiryBadges"></div>
+
+  <!-- Charts row -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📊 OI Distribution — CE vs PE</div>
+        <div id="pcrBadge" class="sentiment-badge neut">—</div>
+      </div>
+      <div class="card-body">
+        <div class="chart-container"><canvas id="oiBarChart"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📉 IV Smile / Skew</div>
+      </div>
+      <div class="card-body">
+        <div class="chart-container"><canvas id="ivChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><div class="card-title">🔄 Change in OI</div></div>
+      <div class="card-body"><div class="chart-container"><canvas id="oiChangeChart"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">💰 Last Price Comparison</div></div>
+      <div class="card-body"><div class="chart-container"><canvas id="priceChart"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- PCR Gauge -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><div class="card-title">📡 Put-Call Ratio Gauge</div></div>
+      <div class="card-body">
+        <div class="pcr-gauge">
+          <div class="gauge-value" id="pcrGaugeVal">—</div>
+          <div class="gauge-track" style="width:100%;max-width:320px">
+            <div class="gauge-fill" id="pcrGaugeFill" style="width:50%"></div>
+          </div>
+          <div class="gauge-labels" style="max-width:320px">
+            <span>0 BEARISH</span><span>1 NEUTRAL</span><span>2 BULLISH</span>
+          </div>
+          <div class="sentiment-badge neut" id="pcrSentBadge">NEUTRAL</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">🏆 Top OI Strikes</div></div>
+      <div class="card-body">
+        <table>
+          <thead>
+            <tr>
+              <th class="center">Type</th>
+              <th class="center">Strike</th>
+              <th>OI (lots)</th>
+              <th>Chg OI</th>
+              <th>Last</th>
+            </tr>
+          </thead>
+          <tbody id="topOITable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /dashboard -->
+
+<!-- ═══════════════════════════════ OPTION CHAIN ═══════════════════════════════ -->
+<div id="tab-chain" class="panel">
+  <div class="controls-bar">
+    <div><label>Expiry</label><select id="chainExpirySel" onchange="renderChainTable()"></select></div>
+    <div>
+      <label>ATM Range</label>
+      <select id="chainRangeSel" onchange="renderChainTable()">
+        <option value="10">±10</option>
+        <option value="15" selected>±15</option>
+        <option value="all">All</option>
+      </select>
+    </div>
+    <button class="btn" onclick="fetchOptionChain()">🔄 Refresh</button>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">NIFTY Option Chain — Full View</div>
+      <span style="font-size:11px;color:var(--text3)">CE = Calls (left) · PE = Puts (right) · <span style="color:var(--accent)">ATM highlighted</span></span>
+    </div>
+    <div class="table-wrap" style="max-height:calc(100vh - 220px);overflow-y:auto">
+      <table id="chainTable">
+        <thead>
+          <tr>
+            <th class="center" colspan="9" style="color:var(--green);border-right:2px solid var(--border2)">CALL (CE)</th>
+            <th class="center strike-col" rowspan="2">STRIKE</th>
+            <th class="center" colspan="9" style="color:var(--red)">PUT (PE)</th>
+          </tr>
+          <tr>
+            <th>OI</th><th>ChgOI</th><th>%ChgOI</th><th>Vol</th>
+            <th class="iv-cell">IV</th><th>LTP</th><th>Chg</th><th>Bid</th><th style="border-right:2px solid var(--border2)">Ask</th>
+            <th></th><!-- strike placeholder -->
+            <th>Bid</th><th>Ask</th><th>Chg</th><th>LTP</th>
+            <th class="iv-cell">IV</th><th>Vol</th><th>%ChgOI</th><th>ChgOI</th><th>OI</th>
+          </tr>
+        </thead>
+        <tbody id="chainTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div><!-- /chain -->
+
+<!-- ═══════════════════════════════ OI ANALYSIS ═══════════════════════════════ -->
+<div id="tab-oi" class="panel">
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><div class="card-title">📊 OI Summary</div></div>
+      <div class="card-body">
+        <div class="oi-summary" id="oiSummary"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">📉 PCR by Expiry</div></div>
+      <div class="card-body"><canvas id="pcrByExpiry"></canvas></div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header"><div class="card-title">📊 CE vs PE OI — All Strikes</div></div>
+    <div class="card-body"><canvas id="oiAllStrikes" style="max-height:320px"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">🏦 Support & Resistance from OI</div></div>
+    <div class="card-body" id="srTable"></div>
+  </div>
+</div><!-- /oi -->
+
+<!-- ═══════════════════════════════ CHARTS ═══════════════════════════════ -->
+<div id="tab-charts" class="panel">
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><div class="card-title">📈 Volume vs OI (CE)</div></div>
+      <div class="card-body"><canvas id="volOIce" style="max-height:240px"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">📉 Volume vs OI (PE)</div></div>
+      <div class="card-body"><canvas id="volOIpe" style="max-height:240px"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">🌊 IV Comparison — CE vs PE (All Strikes)</div></div>
+    <div class="card-body"><canvas id="ivCompare" style="max-height:260px"></canvas></div>
+  </div>
+</div><!-- /charts -->
+
+<!-- ═══════════════════════════════ MAX PAIN ═══════════════════════════════ -->
+<div id="tab-maxpain" class="panel">
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header">
+      <div class="card-title">💀 Max Pain Analysis</div>
+      <div>Max Pain Strike: <span id="mpStrikeDisplay" style="color:var(--orange);font-family:'JetBrains Mono',monospace;font-weight:700">—</span></div>
+    </div>
+    <div class="card-body">
+      <canvas id="maxPainChart" style="max-height:320px"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">📋 Max Pain Table</div></div>
+    <div class="card-body">
+      <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+        <table id="maxPainTable">
+          <thead>
+            <tr>
+              <th class="center">Strike</th>
+              <th>CE OI</th><th>PE OI</th>
+              <th>CE Loss</th><th>PE Loss</th>
+              <th>Total Loss</th>
+            </tr>
+          </thead>
+          <tbody id="maxPainTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div><!-- /maxpain -->
+
+<!-- ═══════════════════════════════ HEATMAP ═══════════════════════════════ -->
+<div id="tab-heatmap" class="panel">
+  <div class="controls-bar">
+    <div><label>View</label>
+      <select id="hmView" onchange="renderHeatmap()">
+        <option value="oi">Open Interest</option>
+        <option value="iv">Implied Volatility</option>
+        <option value="ltp">Last Price</option>
+        <option value="vol">Volume</option>
+      </select>
+    </div>
+    <div><label>Type</label>
+      <select id="hmType" onchange="renderHeatmap()">
+        <option value="both">Both</option>
+        <option value="ce">CE Only</option>
+        <option value="pe">PE Only</option>
+      </select>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><div class="card-title" id="hmCETitle">📊 CE Heatmap</div></div>
+      <div class="card-body"><div class="heatmap-grid" id="hmCE"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title" id="hmPETitle">📊 PE Heatmap</div></div>
+      <div class="card-body"><div class="heatmap-grid" id="hmPE"></div></div>
+    </div>
+  </div>
+</div><!-- /heatmap -->
+
+<!-- ═══════════════════════════════ AI CHATBOT ═══════════════════════════════ -->
+<div id="tab-chatbot" class="panel">
+  <div class="alert alert-info">🤖 AI assistant powered by <b>Qwen API</b>. Configure API key in Admin Settings. The AI can analyze the current option chain data.</div>
+  <div class="grid-2">
+    <div style="display:flex;flex-direction:column">
+      <div class="card-header" style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;border-bottom:1px solid var(--border)">
+        <div class="card-title">💬 Chat with AI</div>
+        <span style="font-size:11px;color:var(--text3)" id="aiModelBadge">Model: —</span>
+      </div>
+      <div class="chat-window" id="chatWindow">
+        <div>
+          <div class="msg-label">AI ASSISTANT</div>
+          <div class="msg msg-ai">👋 Hello! I'm your NIFTY option chain AI assistant. I can help you analyze the option data, interpret PCR, Max Pain, OI buildup, IV skew, and more. First, configure your Qwen API key in Admin Settings, then refresh the data. Ask me anything!</div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input id="chatInput" placeholder="Ask about PCR, IV, OI, Max Pain, strategy..." onkeydown="if(event.key==='Enter')sendChat()">
+        <button class="btn" onclick="sendChat()">Send ➤</button>
+        <button class="btn-outline" onclick="clearChat()">Clear</button>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-header"><div class="card-title">⚡ Quick Prompts</div></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn-outline" onclick="quickPrompt('What is the current market sentiment based on PCR?')">📡 Market Sentiment</button>
+          <button class="btn-outline" onclick="quickPrompt('Which strike has the highest OI and what does it mean?')">📊 Key OI Levels</button>
+          <button class="btn-outline" onclick="quickPrompt('What is the Max Pain level and how far is it from spot?')">💀 Max Pain Analysis</button>
+          <button class="btn-outline" onclick="quickPrompt('Analyze the IV skew and suggest option strategies.')">📈 IV Skew Strategy</button>
+          <button class="btn-outline" onclick="quickPrompt('What are the key support and resistance levels from option chain?')">🔑 Support & Resistance</button>
+          <button class="btn-outline" onclick="quickPrompt('Is there any unusual OI buildup? Any signs of large positions?')">🔍 Unusual OI</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">📊 Current Data Summary</div></div>
+        <div class="card-body" id="aiDataSummary" style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text2);line-height:1.7">
+          Load data first to see summary.
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- /chatbot -->
+
+<!-- ═══════════════════════════════ SETTINGS ═══════════════════════════════ -->
+<div id="tab-settings" class="panel">
+  <div class="alert alert-warn">⚠️ This dashboard fetches LIVE data from NSE. Due to CORS restrictions in browsers, data fetch works only when served from a web server (GitHub Pages, localhost, or via a CORS proxy). Configure below.</div>
+
+  <!-- NSE Cookie -->
+  <div class="settings-section">
+    <h3>🍪 NSE <span>Cookie Configuration</span></h3>
+    <div class="alert alert-info">The NSE website requires a valid session cookie to access option chain data. Copy the full cookie string from your browser while logged into nseindia.com.</div>
+    <div class="form-row">
+      <label>NSE Cookie String</label>
+      <textarea id="cookieInput" placeholder="Paste your full NSE cookie string here...
+Example: _abck=...; bm_sv=...; nsit=...; nseappid=..."></textarea>
+      <div class="hint">💡 Open nseindia.com → F12 → Network → any request → Headers → Copy 'cookie' value</div>
+    </div>
+    <div class="form-row">
+      <label>CORS Proxy URL (optional)</label>
+      <input id="proxyInput" value="https://api.allorigins.win/get?url=" placeholder="e.g. https://api.allorigins.win/get?url=">
+      <div class="hint">Required for browser-based fetching. Leave blank if running via Node.js backend.</div>
+    </div>
+    <div class="form-row">
+      <label>Refresh Interval (seconds)</label>
+      <input id="refreshInterval" type="number" value="5" min="3" max="60">
+      <div class="hint">Minimum 3 seconds recommended. Lower = more real-time but may get rate-limited.</div>
+    </div>
+    <button class="btn" onclick="saveCookieSettings()">💾 Save Cookie Settings</button>
+    <button class="btn-outline" style="margin-left:8px" onclick="testFetch()">🔬 Test Connection</button>
+    <div id="cookieSaveStatus" style="margin-top:10px"></div>
+  </div>
+
+  <!-- AI Config -->
+  <div class="settings-section">
+    <h3>🤖 AI Chatbot <span>Configuration (Qwen)</span></h3>
+    <div class="alert alert-info">Configure Qwen API (free tier available at <a href="https://dashscope.aliyuncs.com" target="_blank" style="color:var(--accent)">dashscope.aliyuncs.com</a> or OpenRouter)</div>
+    <div class="form-row">
+      <label>API Provider</label>
+      <select id="aiProvider" onchange="updateAIProvider()">
+        <option value="openrouter">OpenRouter (Qwen free)</option>
+        <option value="dashscope">Alibaba DashScope (Qwen native)</option>
+        <option value="custom">Custom Endpoint</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>API Key</label>
+      <input id="aiApiKey" type="password" placeholder="sk-...">
+      <div class="hint">Get free Qwen key from OpenRouter.ai or Alibaba Cloud DashScope</div>
+    </div>
+    <div class="form-row">
+      <label>Model</label>
+      <select id="aiModel">
+        <option value="qwen/qwen3-235b-a22b:free">Qwen3-235B-A22B (Free)</option>
+        <option value="qwen/qwen-2.5-72b-instruct:free">Qwen2.5-72B-Instruct (Free)</option>
+        <option value="qwen/qwen-2-7b-instruct:free">Qwen2-7B (Free)</option>
+        <option value="qwen-turbo">Qwen-Turbo (DashScope)</option>
+        <option value="qwen-plus">Qwen-Plus (DashScope)</option>
+      </select>
+    </div>
+    <div class="form-row" id="customEndpointRow" style="display:none">
+      <label>Custom API Endpoint</label>
+      <input id="customEndpoint" placeholder="https://...">
+    </div>
+    <div class="form-row">
+      <label>System Prompt (optional)</label>
+      <textarea id="systemPrompt" rows="3" placeholder="You are an expert Indian stock market analyst specializing in NIFTY options...">You are an expert Indian stock market analyst specializing in NIFTY options. Analyze option chain data and provide actionable insights. Keep responses concise and precise. Use INR formatting. Reference current PCR, OI levels, Max Pain, and IV in your analysis.</textarea>
+    </div>
+    <button class="btn" onclick="saveAISettings()">💾 Save AI Settings</button>
+    <button class="btn-outline" style="margin-left:8px" onclick="testAI()">🧪 Test AI</button>
+    <div id="aiSaveStatus" style="margin-top:10px"></div>
+  </div>
+
+  <!-- GitHub Deploy -->
+  <div class="settings-section">
+    <h3>🚀 <span>GitHub Pages Deployment</span></h3>
+    <div class="alert alert-ok">✅ This dashboard is a single HTML file. Deploy it to GitHub Pages by following the steps below.</div>
+    <ol style="color:var(--text2);font-size:13px;line-height:2;padding-left:20px">
+      <li>Download this HTML file (right-click → Save As)</li>
+      <li>Create a new GitHub repository (e.g., <code style="color:var(--accent)">nifty-dashboard</code>)</li>
+      <li>Upload the file, rename it to <code style="color:var(--accent)">index.html</code></li>
+      <li>Go to Settings → Pages → Source: <b>main branch / root</b></li>
+      <li>Your dashboard will be live at <code style="color:var(--accent)">https://username.github.io/nifty-dashboard</code></li>
+      <li>Open it, go to Admin Settings and paste your NSE cookie</li>
+    </ol>
+    <div style="margin-top:12px">
+      <button class="btn" onclick="downloadDashboard()">⬇️ Download Dashboard HTML</button>
+    </div>
+  </div>
+
+  <!-- Data source info -->
+  <div class="settings-section">
+    <h3>📡 <span>Data Source</span></h3>
+    <div class="form-row">
+      <label>NSE Option Chain URL</label>
+      <input id="nseUrl" value="https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY" readonly>
+    </div>
+    <p style="font-size:12px;color:var(--text3);margin-top:8px">
+      Data fetched every <span id="intervalDisplay" style="color:var(--accent)">5</span> seconds.
+      NSE requires valid session cookies. The dashboard auto-handles JSON parsing and error recovery.
+    </p>
+  </div>
+
+</div><!-- /settings -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let state = {
+  rawData: null,
+  filteredData: [],
+  expiries: [],
+  selectedExpiry: null,
+  symbol: 'NIFTY',
+  spot: 0,
+  atmStrike: 0,
+  refreshTimer: null,
+  refreshInterval: 5,
+  cookie: '',
+  proxy: 'https://api.allorigins.win/get?url=',
+  aiKey: '',
+  aiModel: 'qwen/qwen3-235b-a22b:free',
+  aiProvider: 'openrouter',
+  systemPrompt: '',
+  charts: {},
+  chatHistory: []
+};
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+window.onload = () => {
+  loadSettings();
+  startClock();
+  // Auto-fetch on load (will use sample data if cookie missing)
+  fetchOptionChain();
+};
+
+function loadSettings() {
+  const s = ['cookie','proxy','refreshInterval','aiKey','aiModel','aiProvider','systemPrompt','customEndpoint'];
+  s.forEach(k => {
+    const v = localStorage.getItem('noc_' + k);
+    if (v) state[k] = v;
+  });
+  if (state.cookie) document.getElementById('cookieInput').value = state.cookie;
+  if (state.proxy)  document.getElementById('proxyInput').value  = state.proxy;
+  if (state.refreshInterval) {
+    document.getElementById('refreshInterval').value = state.refreshInterval;
+    document.getElementById('intervalDisplay').textContent = state.refreshInterval;
+  }
+  if (state.aiKey)      document.getElementById('aiApiKey').value     = state.aiKey;
+  if (state.aiModel)    document.getElementById('aiModel').value      = state.aiModel;
+  if (state.aiProvider) document.getElementById('aiProvider').value   = state.aiProvider;
+  if (state.systemPrompt) document.getElementById('systemPrompt').value = state.systemPrompt;
+  document.getElementById('aiModelBadge').textContent = 'Model: ' + (state.aiModel || '—');
+}
+
+// ══════════════════════════════════════════════
+//  CLOCK & MARKET STATUS
+// ══════════════════════════════════════════════
+function startClock() {
+  setInterval(() => {
+    const now = new Date();
+    document.getElementById('clock').textContent = now.toLocaleTimeString('en-IN');
+    const h = now.getHours(), m = now.getMinutes();
+    const isOpen = (h > 9 || (h === 9 && m >= 15)) && (h < 15 || (h === 15 && m <= 30));
+    const el = document.getElementById('mktStatus');
+    el.textContent = isOpen ? 'MARKET OPEN' : 'MARKET CLOSED';
+    el.className = 'mkt-status ' + (isOpen ? 'mkt-open' : 'mkt-close');
+  }, 1000);
+}
+
+// ══════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════
+function showTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  document.querySelector(`[data-tab="${id}"]`).classList.add('active');
+  if (['oi','charts','heatmap'].includes(id) && state.rawData) {
+    setTimeout(() => {
+      if (id === 'oi')      renderOIAnalysis();
+      if (id === 'charts')  renderChartsTab();
+      if (id === 'heatmap') renderHeatmap();
+    }, 50);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  FETCH — NSE OPTION CHAIN
+// ══════════════════════════════════════════════
+async function fetchOptionChain() {
+  setFetchState(true);
+  const sym = document.getElementById('symbolSel').value;
+  state.symbol = sym;
+
+  const url = `https://www.nseindia.com/api/option-chain-indices?symbol=${sym}`;
+  const proxyUrl = state.proxy ? state.proxy + encodeURIComponent(url) : url;
+
+  try {
+    const res = await fetch(proxyUrl, {
+      headers: state.cookie ? { 'Cookie': state.cookie } : {}
+    });
+    let json;
+    if (state.proxy && state.proxy.includes('allorigins')) {
+      const wrapper = await res.json();
+      json = JSON.parse(wrapper.contents);
+    } else {
+      json = await res.json();
+    }
+    if (json && json.records) {
+      processNSEData(json);
+      scheduleRefresh();
+    } else {
+      throw new Error('Invalid response structure');
+    }
+  } catch (e) {
+    console.warn('Live fetch failed, using sample data:', e.message);
+    useSampleData();
+    scheduleRefresh();
+  }
+  setFetchState(false);
+}
+
+function setFetchState(loading) {
+  document.getElementById('fetchSpinner').style.display = loading ? 'inline' : 'none';
+  if (!loading) {
+    document.getElementById('lastUpdated').textContent = '⏱ Updated: ' + new Date().toLocaleTimeString('en-IN');
+  }
+}
+
+function scheduleRefresh() {
+  if (state.refreshTimer) clearTimeout(state.refreshTimer);
+  const interval = (parseInt(state.refreshInterval) || 5) * 1000;
+  state.refreshTimer = setTimeout(fetchOptionChain, interval);
+}
+
+// ══════════════════════════════════════════════
+//  PROCESS NSE DATA
+// ══════════════════════════════════════════════
+function processNSEData(json) {
+  const records = json.records;
+  state.spot = records.underlyingValue || 0;
+  state.atmStrike = findATM(state.spot);
+
+  // Collect expiries
+  const expSet = new Set();
+  records.data.forEach(d => expSet.add(d.expiryDate));
+  state.expiries = [...expSet].sort((a,b) => new Date(a)-new Date(b));
+
+  // Build keyed map
+  const map = {};
+  records.data.forEach(d => {
+    const k = d.strikePrice + '|' + d.expiryDate;
+    if (!map[k]) map[k] = { strike: d.strikePrice, expiry: d.expiryDate, CE: null, PE: null };
+    if (d.CE) map[k].CE = d.CE;
+    if (d.PE) map[k].PE = d.PE;
+  });
+  state.rawData = { map, records };
+
+  // Populate expiry selects
+  populateExpiries();
+  if (!state.selectedExpiry && state.expiries.length) {
+    state.selectedExpiry = state.expiries[0];
+  }
+
+  filterChain();
+  updateMetrics();
+  renderCharts();
+  renderChainTable();
+  renderMaxPain();
+  updateAIDataSummary();
+}
+
+function findATM(spot) {
+  // NIFTY strikes at 50 intervals typically
+  return Math.round(spot / 50) * 50;
+}
+
+function populateExpiries() {
+  ['expirySel','chainExpirySel'].forEach(id => {
+    const sel = document.getElementById(id);
+    const prev = sel.value;
+    sel.innerHTML = '';
+    state.expiries.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e; opt.textContent = e;
+      if (e === prev) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  });
+  renderExpiryBadges();
+}
+
+function renderExpiryBadges() {
+  const el = document.getElementById('expiryBadges');
+  el.innerHTML = '';
+  state.expiries.slice(0,8).forEach((e,i) => {
+    const b = document.createElement('div');
+    b.className = 'badge badge-exp' + (i===0?' active':'');
+    b.textContent = e;
+    b.onclick = () => {
+      document.getElementById('expirySel').value = e;
+      document.getElementById('chainExpirySel').value = e;
+      el.querySelectorAll('.badge').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      filterChain();
+    };
+    el.appendChild(b);
+  });
+}
+
+function filterChain() {
+  const expiry = document.getElementById('expirySel').value || state.expiries[0];
+  state.selectedExpiry = expiry;
+  const range  = document.getElementById('strikeRangeSel').value;
+
+  if (!state.rawData) return;
+  const { map } = state.rawData;
+
+  let rows = Object.values(map).filter(r => r.expiry === expiry);
+  rows.sort((a,b) => a.strike - b.strike);
+
+  if (range !== 'all') {
+    const n = parseInt(range);
+    const atm = state.atmStrike;
+    // Find strikes around ATM
+    const strikesArr = [...new Set(rows.map(r=>r.strike))].sort((a,b)=>a-b);
+    const atmIdx = strikesArr.findIndex(s => s >= atm);
+    const lo = strikesArr[Math.max(0, atmIdx - n)];
+    const hi = strikesArr[Math.min(strikesArr.length-1, atmIdx + n)];
+    rows = rows.filter(r => r.strike >= lo && r.strike <= hi);
+  }
+
+  state.filteredData = rows;
+  updateMetrics();
+  renderCharts();
+  renderChainTable();
+  renderMaxPain();
+}
+
+function onSymbolChange() {
+  state.symbol = document.getElementById('symbolSel').value;
+  const url = `https://www.nseindia.com/api/option-chain-indices?symbol=${state.symbol}`;
+  document.getElementById('nseUrl').value = url;
+  fetchOptionChain();
+}
+
+// ══════════════════════════════════════════════
+//  METRICS
+// ══════════════════════════════════════════════
+function updateMetrics() {
+  const data = state.filteredData;
+  if (!data.length) return;
+
+  document.getElementById('spotPrice').textContent = fmt(state.spot);
+  document.getElementById('atmStrike').textContent  = state.atmStrike;
+
+  const totalCEOI = data.reduce((s,r) => s + (r.CE?.openInterest||0), 0);
+  const totalPEOI = data.reduce((s,r) => s + (r.PE?.openInterest||0), 0);
+  const pcr = totalCEOI ? (totalPEOI / totalCEOI).toFixed(2) : '—';
+
+  document.getElementById('totalCEOI').textContent = fmtOI(totalCEOI);
+  document.getElementById('totalPEOI').textContent = fmtOI(totalPEOI);
+  document.getElementById('pcrOI').textContent = pcr;
+
+  const pcrNum = parseFloat(pcr);
+  let sentiment = 'NEUTRAL', cls = 'neut';
+  if (pcrNum < 0.7)       { sentiment = 'BEARISH'; cls = 'bear'; }
+  else if (pcrNum > 1.3)  { sentiment = 'BULLISH'; cls = 'bull'; }
+  document.getElementById('pcrSentiment').textContent = sentiment;
+  document.getElementById('pcrBadge').textContent = sentiment;
+  document.getElementById('pcrBadge').className = 'sentiment-badge ' + cls;
+  document.getElementById('pcrGaugeVal').textContent = pcr;
+  document.getElementById('pcrSentBadge').textContent = sentiment;
+  document.getElementById('pcrSentBadge').className = 'sentiment-badge ' + cls;
+  const gaugeW = Math.min(100, Math.max(0, (pcrNum / 2) * 100));
+  document.getElementById('pcrGaugeFill').style.width = gaugeW + '%';
+
+  // Max Pain
+  const mp = calcMaxPain(data);
+  document.getElementById('maxPainVal').textContent = mp;
+  document.getElementById('mpStrikeDisplay').textContent = mp;
+
+  // ATM IV
+  const atmRow = data.find(r => r.strike === state.atmStrike) ||
+                 data.reduce((prev,curr) =>
+                   Math.abs(curr.strike - state.atmStrike) < Math.abs(prev.strike - state.atmStrike) ? curr : prev, data[0]);
+  document.getElementById('ceIV').textContent = atmRow?.CE?.impliedVolatility ? atmRow.CE.impliedVolatility.toFixed(2) + '%' : '—';
+  document.getElementById('peIV').textContent = atmRow?.PE?.impliedVolatility ? atmRow.PE.impliedVolatility.toFixed(2) + '%' : '—';
+
+  // Top OI table
+  renderTopOITable(data);
+}
+
+function calcMaxPain(data) {
+  const strikes = data.map(r=>r.strike);
+  let minLoss = Infinity, maxPainStrike = 0;
+  strikes.forEach(targetStrike => {
+    let totalLoss = 0;
+    data.forEach(r => {
+      // CE loss: if spot (target) > strike, CE holders lose
+      if (r.CE) {
+        const intrinsic = Math.max(0, targetStrike - r.strike);
+        totalLoss += intrinsic * (r.CE.openInterest || 0);
+      }
+      // PE loss: if spot (target) < strike, PE holders lose
+      if (r.PE) {
+        const intrinsic = Math.max(0, r.strike - targetStrike);
+        totalLoss += intrinsic * (r.PE.openInterest || 0);
+      }
+    });
+    if (totalLoss < minLoss) { minLoss = totalLoss; maxPainStrike = targetStrike; }
+  });
+  return maxPainStrike;
+}
+
+function renderTopOITable(data) {
+  const rows = [];
+  data.forEach(r => {
+    if (r.CE) rows.push({ type:'CE', strike:r.strike, oi:r.CE.openInterest||0, chgOI:r.CE.changeinOpenInterest||0, ltp:r.CE.lastPrice||0 });
+    if (r.PE) rows.push({ type:'PE', strike:r.strike, oi:r.PE.openInterest||0, chgOI:r.PE.changeinOpenInterest||0, ltp:r.PE.lastPrice||0 });
+  });
+  rows.sort((a,b)=>b.oi-a.oi);
+  const top = rows.slice(0,8);
+  document.getElementById('topOITable').innerHTML = top.map(r => `
+    <tr>
+      <td class="center"><span style="color:${r.type==='CE'?'var(--green)':'var(--red)'}">${r.type}</span></td>
+      <td class="center" style="font-weight:700">${r.strike}</td>
+      <td>${fmtOI(r.oi)}</td>
+      <td class="${r.chgOI>=0?'change-up':'change-down'}">${fmtOI(r.chgOI)}</td>
+      <td>${r.ltp.toFixed(2)}</td>
+    </tr>`).join('');
+}
+
+// ══════════════════════════════════════════════
+//  CHAIN TABLE
+// ══════════════════════════════════════════════
+function renderChainTable() {
+  const expiry = document.getElementById('chainExpirySel').value || state.selectedExpiry;
+  const range  = document.getElementById('chainRangeSel').value;
+  if (!state.rawData) return;
+
+  const { map } = state.rawData;
+  let rows = Object.values(map).filter(r => r.expiry === expiry);
+  rows.sort((a,b) => a.strike - b.strike);
+
+  if (range !== 'all') {
+    const n = parseInt(range);
+    const strikesArr = [...new Set(rows.map(r=>r.strike))].sort((a,b)=>a-b);
+    const atmIdx = strikesArr.findIndex(s => s >= state.atmStrike);
+    const lo = strikesArr[Math.max(0, atmIdx - n)];
+    const hi = strikesArr[Math.min(strikesArr.length-1, atmIdx + n)];
+    rows = rows.filter(r => r.strike >= lo && r.strike <= hi);
+  }
+
+  // Max OI for bar width
+  const maxCEOI = Math.max(...rows.map(r=>r.CE?.openInterest||0));
+  const maxPEOI = Math.max(...rows.map(r=>r.PE?.openInterest||0));
+
+  document.getElementById('chainTbody').innerHTML = rows.map(r => {
+    const isATM  = r.strike === state.atmStrike;
+    const ce = r.CE || {};
+    const pe = r.PE || {};
+    const ceOIBar = maxCEOI ? ((ce.openInterest||0)/maxCEOI*100).toFixed(1) : 0;
+    const peOIBar = maxPEOI ? ((pe.openInterest||0)/maxPEOI*100).toFixed(1) : 0;
+
+    const strikeLbl = isATM ? `${r.strike}<span class="tag tag-atm">ATM</span>` :
+                      r.strike > state.spot ? `${r.strike}<span class="tag tag-otm">OTM</span>` :
+                      `${r.strike}<span class="tag tag-itm">ITM</span>`;
+
+    return `<tr class="${isATM?'atm-row':''}">
+      <td class="ce-bg oi-bar-cell" style="position:relative">
+        <div class="oi-bar ce" style="width:${ceOIBar}%"></div>
+        <span style="position:relative">${fmtOI(ce.openInterest)}</span>
+      </td>
+      <td class="ce-bg ${(ce.changeinOpenInterest||0)>=0?'change-up':'change-down'}">${fmtOI(ce.changeinOpenInterest)}</td>
+      <td class="ce-bg">${safe(ce.pchangeinOpenInterest,'%')}</td>
+      <td class="ce-bg">${fmtOI(ce.totalTradedVolume)}</td>
+      <td class="ce-bg iv-cell">${safe(ce.impliedVolatility,'%')}</td>
+      <td class="ce-bg" style="font-weight:600">${safe(ce.lastPrice)}</td>
+      <td class="ce-bg ${(ce.change||0)>=0?'change-up':'change-down'}">${safe(ce.change)}</td>
+      <td class="ce-bg">${safe(ce.bidprice)}</td>
+      <td class="ce-bg" style="border-right:2px solid var(--border2)">${safe(ce.askPrice)}</td>
+      <td class="strike-cell ${isATM?'atm-strike-cell':''}">${strikeLbl}</td>
+      <td class="pe-bg">${safe(pe.bidprice)}</td>
+      <td class="pe-bg">${safe(pe.askPrice)}</td>
+      <td class="pe-bg ${(pe.change||0)>=0?'change-up':'change-down'}">${safe(pe.change)}</td>
+      <td class="pe-bg" style="font-weight:600">${safe(pe.lastPrice)}</td>
+      <td class="pe-bg iv-cell">${safe(pe.impliedVolatility,'%')}</td>
+      <td class="pe-bg">${fmtOI(pe.totalTradedVolume)}</td>
+      <td class="pe-bg">${safe(pe.pchangeinOpenInterest,'%')}</td>
+      <td class="pe-bg ${(pe.changeinOpenInterest||0)>=0?'change-up':'change-down'}">${fmtOI(pe.changeinOpenInterest)}</td>
+      <td class="pe-bg oi-bar-cell" style="position:relative">
+        <div class="oi-bar pe" style="width:${peOIBar}%"></div>
+        <span style="position:relative">${fmtOI(pe.openInterest)}</span>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+//  CHARTS
+// ══════════════════════════════════════════════
+Chart.defaults.color = '#8892aa';
+Chart.defaults.borderColor = '#1e2535';
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 11;
+
+function mkChart(id, type, data, opts={}) {
+  if (state.charts[id]) { state.charts[id].destroy(); }
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  state.charts[id] = new Chart(ctx, { type, data, options: { responsive:true, ...opts } });
+  return state.charts[id];
+}
+
+function renderCharts() {
+  const data = state.filteredData;
+  if (!data.length) return;
+
+  const labels  = data.map(r => r.strike);
+  const ceOI    = data.map(r => r.CE?.openInterest || 0);
+  const peOI    = data.map(r => r.PE?.openInterest || 0);
+  const ceChgOI = data.map(r => r.CE?.changeinOpenInterest || 0);
+  const peChgOI = data.map(r => r.PE?.changeinOpenInterest || 0);
+  const ceIV    = data.map(r => r.CE?.impliedVolatility || null);
+  const peIV    = data.map(r => r.PE?.impliedVolatility || null);
+  const ceLTP   = data.map(r => r.CE?.lastPrice || null);
+  const peLTP   = data.map(r => r.PE?.lastPrice || null);
+
+  const barOpts = {
+    plugins:{ legend:{ position:'bottom' } },
+    scales:{
+      x:{ grid:{color:'rgba(255,255,255,.04)'} },
+      y:{ grid:{color:'rgba(255,255,255,.04)'} }
+    },
+    animation:{ duration:400 }
+  };
+
+  // OI Bar
+  mkChart('oiBarChart','bar',{
+    labels,
+    datasets:[
+      { label:'CE OI', data:ceOI, backgroundColor:'rgba(0,230,118,.55)', borderColor:'#00e676', borderWidth:1 },
+      { label:'PE OI', data:peOI, backgroundColor:'rgba(255,68,87,.55)',  borderColor:'#ff4457', borderWidth:1 }
+    ]
+  }, barOpts);
+
+  // IV Smile
+  mkChart('ivChart','line',{
+    labels,
+    datasets:[
+      { label:'CE IV', data:ceIV, borderColor:'#00e676', backgroundColor:'rgba(0,230,118,.05)', tension:.4, pointRadius:3, spanGaps:true },
+      { label:'PE IV', data:peIV, borderColor:'#ff4457', backgroundColor:'rgba(255,68,87,.05)',  tension:.4, pointRadius:3, spanGaps:true }
+    ]
+  }, { ...barOpts, scales:{ x:{ grid:{color:'rgba(255,255,255,.04)'} }, y:{ grid:{color:'rgba(255,255,255,.04)'}, title:{ display:true, text:'IV %' } } } });
+
+  // Change in OI
+  mkChart('oiChangeChart','bar',{
+    labels,
+    datasets:[
+      { label:'CE ΔOI', data:ceChgOI, backgroundColor: ceChgOI.map(v=>v>=0?'rgba(0,230,118,.6)':'rgba(255,68,87,.5)'), borderRadius:3 },
+      { label:'PE ΔOI', data:peChgOI, backgroundColor: peChgOI.map(v=>v>=0?'rgba(0,230,118,.4)':'rgba(255,68,87,.35)'), borderRadius:3 }
+    ]
+  }, barOpts);
+
+  // Price Chart
+  mkChart('priceChart','line',{
+    labels,
+    datasets:[
+      { label:'CE LTP', data:ceLTP, borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,.05)', tension:.4, pointRadius:2, spanGaps:true },
+      { label:'PE LTP', data:peLTP, borderColor:'#7c3aed', backgroundColor:'rgba(124,58,237,.05)', tension:.4, pointRadius:2, spanGaps:true }
+    ]
+  }, barOpts);
+}
+
+function renderOIAnalysis() {
+  const data = state.filteredData;
+  if (!data.length) return;
+
+  const totalCEOI = data.reduce((s,r)=>s+(r.CE?.openInterest||0),0);
+  const totalPEOI = data.reduce((s,r)=>s+(r.PE?.openInterest||0),0);
+  const ceBuild   = data.filter(r=>(r.CE?.changeinOpenInterest||0)>0).reduce((s,r)=>s+r.CE.changeinOpenInterest,0);
+  const peBuild   = data.filter(r=>(r.PE?.changeinOpenInterest||0)>0).reduce((s,r)=>s+r.PE.changeinOpenInterest,0);
+
+  document.getElementById('oiSummary').innerHTML = `
+    <div class="oi-box"><div class="val up">${fmtOI(totalCEOI)}</div><div class="lbl">Total CE OI</div></div>
+    <div class="oi-box"><div class="val down">${fmtOI(totalPEOI)}</div><div class="lbl">Total PE OI</div></div>
+    <div class="oi-box"><div class="val up">${(totalCEOI?totalPEOI/totalCEOI:0).toFixed(2)}</div><div class="lbl">PCR (OI)</div></div>
+    <div class="oi-box"><div class="val neutral">${fmtOI(ceBuild)}</div><div class="lbl">CE OI Buildup</div></div>
+    <div class="oi-box"><div class="val neutral">${fmtOI(peBuild)}</div><div class="lbl">PE OI Buildup</div></div>
+    <div class="oi-box"><div class="val" style="color:var(--orange)">${calcMaxPain(data)}</div><div class="lbl">Max Pain</div></div>
+  `;
+
+  // PCR by expiry chart
+  if (state.rawData) {
+    const exps = state.expiries.slice(0,6);
+    const pcrs = exps.map(exp => {
+      const rows = Object.values(state.rawData.map).filter(r=>r.expiry===exp);
+      const cOI = rows.reduce((s,r)=>s+(r.CE?.openInterest||0),0);
+      const pOI = rows.reduce((s,r)=>s+(r.PE?.openInterest||0),0);
+      return cOI ? (pOI/cOI).toFixed(2) : 0;
+    });
+    mkChart('pcrByExpiry','bar',{
+      labels: exps,
+      datasets:[{ label:'PCR', data:pcrs, backgroundColor: pcrs.map(v=>v>=1?'rgba(0,230,118,.6)':'rgba(255,68,87,.6)'), borderRadius:4 }]
+    },{
+      plugins:{ legend:{display:false} },
+      scales:{ x:{grid:{color:'rgba(255,255,255,.04)'}}, y:{grid:{color:'rgba(255,255,255,.04)'},suggestedMin:0,suggestedMax:2} }
+    });
+  }
+
+  // All strikes OI
+  const labels = data.map(r=>r.strike);
+  mkChart('oiAllStrikes','bar',{
+    labels,
+    datasets:[
+      { label:'CE OI', data:data.map(r=>r.CE?.openInterest||0), backgroundColor:'rgba(0,230,118,.55)', borderColor:'#00e676', borderWidth:1 },
+      { label:'PE OI', data:data.map(r=>r.PE?.openInterest||0), backgroundColor:'rgba(255,68,87,.55)',  borderColor:'#ff4457', borderWidth:1 }
+    ]
+  },{
+    plugins:{ legend:{position:'bottom'} },
+    scales:{ x:{grid:{color:'rgba(255,255,255,.04)'}}, y:{grid:{color:'rgba(255,255,255,.04)'}} }
+  });
+
+  // Support/Resistance
+  const maxPEStrike = data.reduce((m,r) => (!m || (r.PE?.openInterest||0)>(m.PE?.openInterest||0)) ? r : m, null);
+  const maxCEStrike = data.reduce((m,r) => (!m || (r.CE?.openInterest||0)>(m.CE?.openInterest||0)) ? r : m, null);
+  document.getElementById('srTable').innerHTML = `
+    <table style="width:100%;font-size:12px">
+      <thead><tr>
+        <th class="center">Level</th><th class="center">Strike</th><th class="center">Type</th><th>OI</th><th>Significance</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="center" style="color:var(--green)">🛡️ SUPPORT</td>
+          <td class="center" style="font-weight:700;color:var(--green)">${maxPEStrike?.strike||'—'}</td>
+          <td class="center">PE (Max OI)</td>
+          <td>${fmtOI(maxPEStrike?.PE?.openInterest)}</td>
+          <td>Strong support — high PE writing means sellers expect price to hold here</td>
+        </tr>
+        <tr>
+          <td class="center" style="color:var(--red)">⚔️ RESISTANCE</td>
+          <td class="center" style="font-weight:700;color:var(--red)">${maxCEStrike?.strike||'—'}</td>
+          <td class="center">CE (Max OI)</td>
+          <td>${fmtOI(maxCEStrike?.CE?.openInterest)}</td>
+          <td>Strong resistance — high CE writing means sellers expect price to be capped here</td>
+        </tr>
+        <tr>
+          <td class="center" style="color:var(--orange)">🎯 MAX PAIN</td>
+          <td class="center" style="font-weight:700;color:var(--orange)">${calcMaxPain(data)}</td>
+          <td class="center">Combined OI</td>
+          <td>—</td>
+          <td>Market may gravitate toward this strike at expiry (options writers' benefit)</td>
+        </tr>
+      </tbody>
+    </table>`;
+}
+
+function renderChartsTab() {
+  const data = state.filteredData;
+  if (!data.length) return;
+  const labels = data.map(r=>r.strike);
+  const opts = { plugins:{legend:{position:'bottom'}}, scales:{ x:{grid:{color:'rgba(255,255,255,.04)'}}, y:{grid:{color:'rgba(255,255,255,.04)'}} } };
+
+  mkChart('volOIce','bar',{
+    labels,
+    datasets:[
+      { label:'CE Volume', data:data.map(r=>r.CE?.totalTradedVolume||0), backgroundColor:'rgba(0,212,255,.5)', yAxisID:'y' },
+      { label:'CE OI',     data:data.map(r=>r.CE?.openInterest||0),       backgroundColor:'rgba(0,230,118,.4)', yAxisID:'y' }
+    ]
+  }, opts);
+
+  mkChart('volOIpe','bar',{
+    labels,
+    datasets:[
+      { label:'PE Volume', data:data.map(r=>r.PE?.totalTradedVolume||0), backgroundColor:'rgba(124,58,237,.5)', yAxisID:'y' },
+      { label:'PE OI',     data:data.map(r=>r.PE?.openInterest||0),       backgroundColor:'rgba(255,68,87,.4)',   yAxisID:'y' }
+    ]
+  }, opts);
+
+  mkChart('ivCompare','line',{
+    labels,
+    datasets:[
+      { label:'CE IV',data:data.map(r=>r.CE?.impliedVolatility||null),borderColor:'#00e676',backgroundColor:'rgba(0,230,118,.07)',tension:.4,pointRadius:3,spanGaps:true },
+      { label:'PE IV',data:data.map(r=>r.PE?.impliedVolatility||null),borderColor:'#ff4457',backgroundColor:'rgba(255,68,87,.07)',  tension:.4,pointRadius:3,spanGaps:true }
+    ]
+  },{ ...opts, scales:{ x:{grid:{color:'rgba(255,255,255,.04)'}}, y:{grid:{color:'rgba(255,255,255,.04)'},title:{display:true,text:'IV %'}} } });
+}
+
+// ══════════════════════════════════════════════
+//  MAX PAIN
+// ══════════════════════════════════════════════
+function renderMaxPain() {
+  const data = state.filteredData;
+  if (!data.length) return;
+
+  const strikes = data.map(r=>r.strike);
+  const rows = [];
+  let minLoss = Infinity, mpStrike = 0;
+
+  strikes.forEach(target => {
+    let ceLoss=0, peLoss=0;
+    data.forEach(r => {
+      ceLoss += Math.max(0, target - r.strike) * (r.CE?.openInterest||0);
+      peLoss += Math.max(0, r.strike - target) * (r.PE?.openInterest||0);
+    });
+    const total = ceLoss + peLoss;
+    rows.push({ strike:target, ceLoss, peLoss, total, ceOI:data.find(r=>r.strike===target)?.CE?.openInterest||0, peOI:data.find(r=>r.strike===target)?.PE?.openInterest||0 });
+    if (total < minLoss) { minLoss = total; mpStrike = target; }
+  });
+
+  mkChart('maxPainChart','line',{
+    labels: rows.map(r=>r.strike),
+    datasets:[{
+      label:'Total Pain',
+      data: rows.map(r=>r.total),
+      borderColor:'#ff9500',
+      backgroundColor:'rgba(255,149,0,.08)',
+      tension:.4, fill:true, pointRadius:3,
+      pointBackgroundColor: rows.map(r=>r.strike===mpStrike?'#ff9500':'transparent'),
+      pointBorderColor: rows.map(r=>r.strike===mpStrike?'#fff':'transparent'),
+      pointRadius: rows.map(r=>r.strike===mpStrike?7:3)
+    }]
+  },{
+    plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=>'Pain: ' + fmtN(ctx.raw) } } },
+    scales:{ x:{grid:{color:'rgba(255,255,255,.04)'}}, y:{grid:{color:'rgba(255,255,255,.04)'}} },
+    annotation:{} // placeholder
+  });
+
+  document.getElementById('maxPainTbody').innerHTML = rows.map(r => `
+    <tr style="${r.strike===mpStrike?'background:rgba(255,149,0,.08)':''}">
+      <td class="center" style="font-weight:700;${r.strike===mpStrike?'color:var(--orange)':''}">${r.strike}${r.strike===mpStrike?' 🎯':''}</td>
+      <td>${fmtOI(r.ceOI)}</td><td>${fmtOI(r.peOI)}</td>
+      <td>${fmtN(r.ceLoss)}</td><td>${fmtN(r.peLoss)}</td>
+      <td style="font-weight:600;${r.strike===mpStrike?'color:var(--orange)':''}">${fmtN(r.total)}</td>
+    </tr>`).join('');
+}
+
+// ══════════════════════════════════════════════
+//  HEATMAP
+// ══════════════════════════════════════════════
+function renderHeatmap() {
+  const data = state.filteredData;
+  if (!data.length) return;
+  const view = document.getElementById('hmView').value;
+  const type = document.getElementById('hmType').value;
+
+  function getVal(r, side) {
+    if (view === 'oi')  return r[side]?.openInterest || 0;
+    if (view === 'iv')  return r[side]?.impliedVolatility || 0;
+    if (view === 'ltp') return r[side]?.lastPrice || 0;
+    if (view === 'vol') return r[side]?.totalTradedVolume || 0;
+    return 0;
+  }
+
+  function color(val, max, side) {
+    const ratio = max ? val / max : 0;
+    const base = side === 'CE' ? [0,230,118] : [255,68,87];
+    const bg = `rgba(${base[0]},${base[1]},${base[2]},${0.1 + ratio * 0.75})`;
+    return bg;
+  }
+
+  function renderGrid(containerId, side) {
+    const vals = data.map(r => getVal(r, side));
+    const max = Math.max(...vals);
+    document.getElementById(containerId).innerHTML = data.map((r,i) => `
+      <div class="hm-cell" style="background:${color(vals[i],max,side)}" title="${side} ${view.toUpperCase()}: ${vals[i]}">
+        <div class="hm-strike">${r.strike}</div>
+        <div class="hm-val">${vals[i] > 999 ? (vals[i]/1000).toFixed(0)+'K' : vals[i].toFixed(1)}</div>
+      </div>
+    `).join('');
+  }
+
+  if (type !== 'pe') renderGrid('hmCE', 'CE');
+  if (type !== 'ce') renderGrid('hmPE', 'PE');
+  document.getElementById('hmCETitle').textContent = `📊 CE Heatmap — ${view.toUpperCase()}`;
+  document.getElementById('hmPETitle').textContent = `📊 PE Heatmap — ${view.toUpperCase()}`;
+}
+
+// ══════════════════════════════════════════════
+//  SAMPLE DATA (fallback when NSE blocked)
+// ══════════════════════════════════════════════
+function useSampleData() {
+  const spot = 25631.65;
+  state.spot = spot;
+  state.atmStrike = findATM(spot);
+
+  const expiries = ['03-Jul-2025','10-Jul-2025','17-Jul-2025','31-Jul-2025','28-Aug-2025','25-Sep-2025'];
+  state.expiries = expiries;
+
+  const strikeData = [
+    {s:23000,ceOI:471,ceChg:-8,ceIV:0,ceLTP:2615,ceVol:16,ceChng:99,ceBid:2652,ceAsk:2664,
+             peOI:33227,peChg:-2314,peIV:32.31,peLTP:1.25,peVol:115185,peChng:-1,peBid:1.25,peAsk:1.3},
+    {s:23500,ceOI:405,ceChg:0,ceIV:0,ceLTP:2159,ceVol:7,ceChng:141,ceBid:2154,ceAsk:2160,
+             peOI:43884,peChg:-185,peIV:27.92,peLTP:2,peVol:112346,peChng:-0.9,peBid:1.95,peAsk:2},
+    {s:24000,ceOI:2299,ceChg:-190,ceIV:0,ceLTP:1644,ceVol:252,ceChng:120,ceBid:1657,ceAsk:1666,
+             peOI:66176,peChg:-577,peIV:23.65,peLTP:3.55,peVol:227692,peChng:-2.35,peBid:3.5,peAsk:3.55},
+    {s:24500,ceOI:5100,ceChg:-300,ceIV:0,ceLTP:1144,ceVol:190,ceChng:110,ceBid:1150,ceAsk:1155,
+             peOI:55000,peChg:-800,peIV:20.5,peLTP:5.5,peVol:95000,peChng:-2.5,peBid:5.45,peAsk:5.55},
+    {s:24800,ceOI:3200,ceChg:-150,ceIV:0,ceLTP:870,ceVol:140,ceChng:90,ceBid:868,ceAsk:872,
+             peOI:42000,peChg:-500,peIV:18.2,peLTP:9.5,peVol:75000,peChng:-3.2,peBid:9.45,peAsk:9.55},
+    {s:25000,ceOI:8500,ceChg:200,ceIV:0,ceLTP:675,ceVol:320,ceChng:85,ceBid:674,ceAsk:676,
+             peOI:38000,peChg:1200,peIV:17.1,peLTP:15.5,peVol:62000,peChng:-5.8,peBid:15.4,peAsk:15.6},
+    {s:25200,ceOI:4100,ceChg:100,ceIV:19.5,ceLTP:490,ceVol:180,ceChng:70,ceBid:489,ceAsk:491,
+             peOI:22000,peChg:400,peIV:17.8,peLTP:22,peVol:44000,peChng:-7,peBid:21.8,peAsk:22.2},
+    {s:25400,ceOI:3500,ceChg:80,ceIV:18.9,ceLTP:320,ceVol:150,ceChng:55,ceBid:319,ceAsk:321,
+             peOI:18000,peChg:300,peIV:17.3,peLTP:32,peVol:35000,peChng:-8.5,peBid:31.8,peAsk:32.2},
+    {s:25500,ceOI:12000,ceChg:500,ceIV:18.2,ceLTP:240,ceVol:420,ceChng:45,ceBid:239,ceAsk:241,
+             peOI:28000,peChg:1500,peIV:17.0,peLTP:42,peVol:55000,peChng:-10,peBid:41.8,peAsk:42.2},
+    {s:25600,ceOI:6000,ceChg:200,ceIV:17.8,ceLTP:170,ceVol:280,ceChng:38,ceBid:169,ceAsk:171,
+             peOI:20000,peChg:600,peIV:16.8,peLTP:55,peVol:40000,peChng:-12,peBid:54.8,peAsk:55.2},
+    {s:25631,ceOI:5800,ceChg:180,ceIV:17.5,ceLTP:150,ceVol:250,ceChng:33,ceBid:149,ceAsk:151,
+             peOI:18500,peChg:500,peIV:16.5,peLTP:62,peVol:38000,peChng:-13,peBid:61.8,peAsk:62.2},
+    {s:25700,ceOI:7500,ceChg:-100,ceIV:17.3,ceLTP:110,ceVol:300,ceChng:25,ceBid:109,ceAsk:111,
+             peOI:15000,peChg:-200,peIV:16.9,peLTP:72,peVol:30000,peChng:-14,peBid:71.8,peAsk:72.2},
+    {s:25800,ceOI:9000,ceChg:-200,ceIV:17.1,ceLTP:78,ceVol:350,ceChng:18,ceBid:77,ceAsk:79,
+             peOI:12000,peChg:-300,peIV:17.2,peLTP:88,peVol:24000,peChng:-15,peBid:87.8,peAsk:88.2},
+    {s:26000,ceOI:15000,ceChg:-500,ceIV:16.8,ceLTP:38,ceVol:600,ceChng:9,ceBid:37.8,ceAsk:38.2,
+             peOI:9000,peChg:-400,peIV:17.8,peLTP:118,peVol:18000,peChng:-18,peBid:117.8,peAsk:118.2},
+    {s:26200,ceOI:18000,ceChg:-800,ceIV:16.5,ceLTP:20,ceVol:800,ceChng:4.5,ceBid:19.8,ceAsk:20.2,
+             peOI:6000,peChg:-200,peIV:18.5,peLTP:155,peVol:12000,peChng:-22,peBid:154.8,peAsk:155.2},
+    {s:26500,ceOI:22000,ceChg:-1000,ceIV:16.2,ceLTP:8,ceVol:950,ceChng:1.5,ceBid:7.9,ceAsk:8.1,
+             peOI:4500,peChg:-100,peIV:19.2,peLTP:205,peVol:8000,peChng:-25,peBid:204.8,peAsk:205.2},
+  ];
+
+  const map = {};
+  strikeData.forEach(sd => {
+    expiries.forEach((exp,ei) => {
+      const scale = 1 - ei*0.1;
+      const k = `${sd.s}|${exp}`;
+      map[k] = {
+        strike: sd.s, expiry: exp,
+        CE: { openInterest:Math.round(sd.ceOI*scale*(1+Math.random()*.2)), changeinOpenInterest:Math.round(sd.ceChg*scale), pchangeinOpenInterest:sd.ceChg/100, totalTradedVolume:Math.round(sd.ceVol*scale), impliedVolatility:sd.ceIV||(17+Math.random()*5), lastPrice:sd.ceLTP*scale, change:sd.ceChng*scale, pChange:5, totalBuyQuantity:1000, totalSellQuantity:1000, bidprice:sd.ceBid*scale, askPrice:sd.ceAsk*scale, underlyingValue:spot },
+        PE: { openInterest:Math.round(sd.peOI*scale*(1+Math.random()*.2)), changeinOpenInterest:Math.round(sd.peChg*scale), pchangeinOpenInterest:sd.peChg/100, totalTradedVolume:Math.round(sd.peVol*scale), impliedVolatility:sd.peIV, lastPrice:sd.peLTP/scale, change:sd.peChng/scale, pChange:-5, totalBuyQuantity:1000, totalSellQuantity:1000, bidprice:sd.peBid/scale, askPrice:sd.peAsk/scale, underlyingValue:spot }
+      };
+    });
+  });
+
+  state.rawData = { map };
+  populateExpiries();
+  state.selectedExpiry = expiries[0];
+  document.getElementById('expirySel').value = expiries[0];
+  document.getElementById('chainExpirySel').value = expiries[0];
+  filterChain();
+  document.getElementById('lastUpdated').textContent = '⚠️ Sample data (NSE blocked — add cookie in Settings)';
+}
+
+// ══════════════════════════════════════════════
+//  AI CHATBOT
+// ══════════════════════════════════════════════
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  appendMsg('user', msg);
+
+  const thinking = showThinking();
+  const contextStr = buildContextForAI();
+
+  state.chatHistory.push({ role:'user', content: contextStr + '\n\nUser question: ' + msg });
+
+  try {
+    const reply = await callAI(state.chatHistory);
+    removeThinking(thinking);
+    appendMsg('ai', reply);
+    state.chatHistory.push({ role:'assistant', content: reply });
+  } catch(e) {
+    removeThinking(thinking);
+    appendMsg('ai', '❌ Error: ' + e.message + '\n\nPlease check your API key in Admin Settings.');
+  }
+}
+
+function quickPrompt(p) {
+  document.getElementById('chatInput').value = p;
+  sendChat();
+}
+function clearChat() {
+  state.chatHistory = [];
+  document.getElementById('chatWindow').innerHTML = '<div><div class="msg-label">AI ASSISTANT</div><div class="msg msg-ai">Chat cleared. Ask me anything about NIFTY options!</div></div>';
+}
+
+function appendMsg(role, text) {
+  const win = document.getElementById('chatWindow');
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <div class="msg-label">${role === 'user' ? 'YOU' : 'AI ASSISTANT'}</div>
+    <div class="msg msg-${role === 'user' ? 'user' : 'ai'}" style="white-space:pre-wrap">${text}</div>
+  `;
+  win.appendChild(div);
+  win.scrollTop = win.scrollHeight;
+}
+
+function showThinking() {
+  const win = document.getElementById('chatWindow');
+  const div = document.createElement('div');
+  div.id = 'thinkingDiv';
+  div.innerHTML = '<div class="chat-thinking"><div class="dot1"></div><div class="dot2"></div><div class="dot3"></div></div>';
+  win.appendChild(div);
+  win.scrollTop = win.scrollHeight;
+  return div;
+}
+function removeThinking(el) { el?.remove(); }
+
+async function callAI(messages) {
+  const apiKey = state.aiKey || localStorage.getItem('noc_aiKey');
+  if (!apiKey) throw new Error('API key not configured. Go to Admin Settings → AI Chatbot Configuration.');
+
+  const provider = state.aiProvider;
+  const model = state.aiModel || 'qwen/qwen3-235b-a22b:free';
+  const sysPrompt = state.systemPrompt || 'You are an expert Indian stock market analyst specializing in NIFTY options.';
+
+  let endpoint, headers, body;
+
+  if (provider === 'openrouter') {
+    endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+    headers = { 'Content-Type':'application/json', 'Authorization':'Bearer ' + apiKey, 'HTTP-Referer':'https://nifty-option-dashboard.github.io', 'X-Title':'NIFTY Option Dashboard' };
+  } else if (provider === 'dashscope') {
+    endpoint = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation';
+    headers = { 'Content-Type':'application/json', 'Authorization':'Bearer ' + apiKey };
+  } else {
+    endpoint = state.customEndpoint || localStorage.getItem('noc_customEndpoint') || '';
+    headers = { 'Content-Type':'application/json', 'Authorization':'Bearer ' + apiKey };
+  }
+
+  if (provider === 'dashscope') {
+    body = JSON.stringify({
+      model: model.replace(':free',''),
+      input: { messages: [{ role:'system', content:sysPrompt }, ...messages.slice(-6)] },
+      parameters: { result_format:'message', max_tokens:800 }
+    });
+  } else {
+    body = JSON.stringify({
+      model,
+      messages: [{ role:'system', content:sysPrompt }, ...messages.slice(-6)],
+      max_tokens: 800,
+      temperature: 0.7
+    });
+  }
+
+  const res = await fetch(endpoint, { method:'POST', headers, body });
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({error:{message:'HTTP '+res.status}}));
+    throw new Error(err.error?.message || 'API Error ' + res.status);
+  }
+  const data = await res.json();
+  if (provider === 'dashscope') {
+    return data.output?.choices?.[0]?.message?.content || 'No response';
+  }
+  return data.choices?.[0]?.message?.content || 'No response';
+}
+
+function buildContextForAI() {
+  const d = state.filteredData;
+  if (!d.length) return 'No option data loaded.';
+  const ceOI = d.reduce((s,r)=>s+(r.CE?.openInterest||0),0);
+  const peOI = d.reduce((s,r)=>s+(r.PE?.openInterest||0),0);
+  const pcr  = ceOI ? (peOI/ceOI).toFixed(2) : 'N/A';
+  const mp   = calcMaxPain(d);
+  const atm  = state.atmStrike;
+  const atmRow = d.reduce((p,c) => Math.abs(c.strike-atm)<Math.abs(p.strike-atm)?c:p, d[0]);
+  return `NIFTY Option Chain Context:
+Symbol: ${state.symbol} | Spot: ${state.spot} | ATM: ${atm}
+Expiry: ${state.selectedExpiry}
+Total CE OI: ${fmtOI(ceOI)} | Total PE OI: ${fmtOI(peOI)}
+PCR (OI): ${pcr} | Max Pain: ${mp}
+ATM CE IV: ${atmRow?.CE?.impliedVolatility?.toFixed(2)||'—'}% | ATM PE IV: ${atmRow?.PE?.impliedVolatility?.toFixed(2)||'—'}%
+ATM CE LTP: ${atmRow?.CE?.lastPrice?.toFixed(2)||'—'} | ATM PE LTP: ${atmRow?.PE?.lastPrice?.toFixed(2)||'—'}
+Top CE OI Strike: ${d.reduce((m,r)=>((r.CE?.openInterest||0)>(m.CE?.openInterest||0)?r:m),d[0]).strike}
+Top PE OI Strike: ${d.reduce((m,r)=>((r.PE?.openInterest||0)>(m.PE?.openInterest||0)?r:m),d[0]).strike}`;
+}
+
+function updateAIDataSummary() {
+  document.getElementById('aiDataSummary').textContent = buildContextForAI();
+}
+
+// ══════════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════════
+function saveCookieSettings() {
+  const cookie   = document.getElementById('cookieInput').value.trim();
+  const proxy    = document.getElementById('proxyInput').value.trim();
+  const interval = document.getElementById('refreshInterval').value;
+  state.cookie = cookie; state.proxy = proxy; state.refreshInterval = interval;
+  localStorage.setItem('noc_cookie', cookie);
+  localStorage.setItem('noc_proxy', proxy);
+  localStorage.setItem('noc_refreshInterval', interval);
+  document.getElementById('intervalDisplay').textContent = interval;
+  showStatus('cookieSaveStatus', 'ok', '✅ Settings saved! Refreshing data...');
+  setTimeout(fetchOptionChain, 500);
+}
+
+async function testFetch() {
+  showStatus('cookieSaveStatus', 'info', '🔄 Testing connection...');
+  try {
+    await fetchOptionChain();
+    showStatus('cookieSaveStatus', 'ok', '✅ Connection successful! Data loaded.');
+  } catch(e) {
+    showStatus('cookieSaveStatus', 'err', '❌ Failed: ' + e.message);
+  }
+}
+
+function saveAISettings() {
+  const key    = document.getElementById('aiApiKey').value.trim();
+  const model  = document.getElementById('aiModel').value;
+  const prov   = document.getElementById('aiProvider').value;
+  const sysp   = document.getElementById('systemPrompt').value;
+  const custom = document.getElementById('customEndpoint').value;
+  state.aiKey = key; state.aiModel = model; state.aiProvider = prov; state.systemPrompt = sysp;
+  localStorage.setItem('noc_aiKey', key);
+  localStorage.setItem('noc_aiModel', model);
+  localStorage.setItem('noc_aiProvider', prov);
+  localStorage.setItem('noc_systemPrompt', sysp);
+  localStorage.setItem('noc_customEndpoint', custom);
+  document.getElementById('aiModelBadge').textContent = 'Model: ' + model;
+  showStatus('aiSaveStatus', 'ok', '✅ AI settings saved!');
+}
+
+async function testAI() {
+  showStatus('aiSaveStatus', 'info', '🧪 Testing AI...');
+  try {
+    const reply = await callAI([{ role:'user', content:'Reply with just: "AI connection successful!"' }]);
+    showStatus('aiSaveStatus', 'ok', '✅ AI works! Reply: ' + reply.slice(0,80));
+  } catch(e) {
+    showStatus('aiSaveStatus', 'err', '❌ ' + e.message);
+  }
+}
+
+function updateAIProvider() {
+  const p = document.getElementById('aiProvider').value;
+  document.getElementById('customEndpointRow').style.display = p === 'custom' ? 'block' : 'none';
+  if (p === 'openrouter') {
+    document.getElementById('aiModel').innerHTML = `
+      <option value="qwen/qwen3-235b-a22b:free">Qwen3-235B-A22B (Free)</option>
+      <option value="qwen/qwen-2.5-72b-instruct:free">Qwen2.5-72B-Instruct (Free)</option>
+      <option value="qwen/qwen-2-7b-instruct:free">Qwen2-7B (Free)</option>`;
+  } else if (p === 'dashscope') {
+    document.getElementById('aiModel').innerHTML = `
+      <option value="qwen-turbo">Qwen-Turbo</option>
+      <option value="qwen-plus">Qwen-Plus</option>
+      <option value="qwen-max">Qwen-Max</option>`;
+  }
+}
+
+function showStatus(id, type, msg) {
+  const el = document.getElementById(id);
+  const cls = { ok:'alert-ok', err:'alert-err', info:'alert-info', warn:'alert-warn' }[type];
+  el.innerHTML = `<div class="alert ${cls}">${msg}</div>`;
+  if (type === 'ok') setTimeout(()=>el.innerHTML='', 5000);
+}
+
+function downloadDashboard() {
+  const html = document.documentElement.outerHTML;
+  const blob = new Blob([html], { type:'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'nifty_option_dashboard.html';
+  a.click();
+}
+
+// ══════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════
+function fmt(n)    { return n ? n.toLocaleString('en-IN', {minimumFractionDigits:2,maximumFractionDigits:2}) : '—'; }
+function fmtOI(n)  { if (!n && n!==0) return '—'; if (Math.abs(n)>=1e6) return (n/1e6).toFixed(2)+'M'; if (Math.abs(n)>=1e3) return (n/1e3).toFixed(1)+'K'; return n.toFixed?n.toFixed(0):n; }
+function fmtN(n)   { if (!n) return '—'; if (n>=1e9) return (n/1e9).toFixed(2)+'B'; if (n>=1e6) return (n/1e6).toFixed(2)+'M'; if (n>=1e3) return (n/1e3).toFixed(1)+'K'; return Math.round(n); }
+function safe(v, suffix='') { if (v===undefined||v===null||v==='') return '—'; return (typeof v==='number'?v.toFixed(2):v)+suffix; }
+</script>
+</body>
+</html>
