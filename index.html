@@ -100,12 +100,13 @@ select:focus,input:focus{border-color:var(--accent)}
 
 /* CHAIN TABLE */
 .chain-wrap{padding:0 16px 16px}
-.chain-hd{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r) var(--r) 0 0;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.chain-hd{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r) var(--r) 0 0;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;position:relative;z-index:6}
 .chain-title{font-size:13px;font-weight:700}
-.chain-underlying{padding:7px 14px;background:rgba(59,130,246,.05);border-left:3px solid var(--accent);font-size:12px;color:var(--text2);border-bottom:1px solid var(--border)}
-.chain-scroll{overflow-x:auto;max-height:600px;overflow-y:auto}
+.chain-underlying{padding:7px 14px;background:rgba(59,130,246,.05);border-left:3px solid var(--accent);font-size:12px;color:var(--text2);border-bottom:1px solid var(--border);position:relative;z-index:6}
+.chain-scroll{overflow-x:auto;max-height:600px;overflow-y:auto;position:relative;isolation:isolate}
 table.oc{width:100%;border-collapse:collapse;font-size:11.5px;font-family:'JetBrains Mono',monospace}
-table.oc thead{position:sticky;top:0;z-index:10}
+table.oc thead{position:sticky;top:0;z-index:5}
+table.oc thead th{position:sticky;top:0}
 table.oc th{background:var(--bg3);color:var(--text2);padding:7px 5px;text-align:right;font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-bottom:2px solid var(--border2);white-space:nowrap}
 table.oc th.ce-hdr{color:var(--green);background:rgba(34,197,94,.07)}
 table.oc th.pe-hdr{color:var(--red);background:rgba(239,68,68,.07)}
@@ -138,7 +139,7 @@ select.ns{background:#fff;border:1.5px solid #ea580c;color:#ea580c;border-radius
 .nse-ubar{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid #e5e7eb;font-size:12px;color:#555}
 .nse-ubar strong{color:#1e3a8a}
 .nse-dl-btn{color:#ea580c;font-weight:600;font-size:12px;cursor:pointer}
-.nse-tbl-scroll{overflow-x:auto;max-height:600px;overflow-y:auto}
+.nse-tbl-scroll{overflow-x:auto;max-height:600px;overflow-y:auto;position:relative;isolation:isolate}
 table.noc{width:100%;border-collapse:collapse;font-size:12px;color:#1a1a2e}
 table.noc th{padding:7px 5px;font-weight:700;border:1px solid #ddd;font-size:10.5px;text-transform:uppercase}
 table.noc th.cg{background:#1e3a8a;color:#fff;text-align:center}
@@ -266,7 +267,7 @@ code{background:var(--bg3);border:1px solid var(--border2);border-radius:3px;pad
 .exp-bdg:hover{border-color:var(--accent);color:var(--accent)}
 .exp-bdg.active{background:rgba(59,130,246,.12);border-color:var(--accent);color:var(--accent)}
 
-#errBar{display:none;background:rgba(249,115,22,.08);border-bottom:1px solid rgba(249,115,22,.25);color:#fdba74;padding:7px 16px;font-size:12px;align-items:center;gap:8px}
+#errBar{display:none;background:rgba(239,68,68,.12);border-bottom:2px solid rgba(239,68,68,.4);color:#fca5a5;padding:10px 16px;font-size:13px;align-items:center;gap:8px;font-weight:600}
 #errBar.show{display:flex}
 
 .full-pad{padding:14px 16px}
@@ -826,16 +827,16 @@ gunicorn</div>
       </div>
 
       <div class="fr">
-        <label>Your Backend Proxy URL</label>
-        <input id="sProxyUrl" placeholder="https://your-worker.workers.dev OR https://your-app.onrender.com">
-        <div class="hint">Paste your Cloudflare Worker / Render URL here. Leave empty to use sample data.</div>
+        <label>🌐 Your Backend Proxy URL</label>
+        <input id="sProxyUrl" placeholder="https://your-worker.workers.dev">
+        <div class="hint">Paste full URL with <b>https://</b>. No trailing slash. Empty = sample data only.</div>
       </div>
       <div class="fr">
         <label>Proxy Type</label>
         <select id="sProxyType">
-          <option value="cloudflare">Cloudflare Worker (?url= format)</option>
-          <option value="render">Render Python (/option-chain?symbol= format)</option>
-          <option value="allorigins">Public allorigins (fallback)</option>
+          <option value="cloudflare">Cloudflare Worker (recommended — free 100k req/day)</option>
+          <option value="render">Render Python (slower, sleeps after 15min)</option>
+          <option value="allorigins">Public allorigins (unreliable — last resort)</option>
         </select>
       </div>
       <div class="fr">
@@ -843,8 +844,8 @@ gunicorn</div>
         <input id="sInterval" type="number" value="5" min="3" max="300">
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn" onclick="saveCfg()">💾 Save & Test</button>
-        <button class="btn-outline" onclick="testConn()">🔬 Test Connection</button>
+        <button class="btn" onclick="testConn()">🔬 Test Proxy Now</button>
+        <button class="btn-outline" onclick="saveCfg()">💾 Save Only</button>
       </div>
       <div id="cfgSt" style="margin-top:10px"></div>
     </div>
@@ -954,6 +955,8 @@ function loadCfg() {
   set('aApiKey',S.angelKey);
   set('aClientId',S.angelClientId);
   set('symSel',S.symbol);
+  set('nseSymSel',S.symbol);
+  const tsl=document.getElementById('topSymLbl'); if(tsl) tsl.textContent=S.symbol;
   applyTheme(S.theme);
   const mb=document.getElementById('aiModelBadge');if(mb)mb.textContent=S.gemModel||'—';
   if(S.angelConnected==='true'||S.angelConnected===true) {
@@ -1081,15 +1084,17 @@ async function doFetch(manual=false) {
     processData(json);
     S.lastFetchOK = true;
     S.retryCount = 0;
-    setConn('live', source === 'user-proxy' ? '🟢 Live NSE (Your Proxy)' : '🟢 Live NSE (Public Proxy)');
+    setConn('live', source === 'user-proxy' ? '🟢 LIVE NSE (your proxy)' : '🟢 LIVE NSE (public proxy)');
     document.getElementById('errBar').classList.remove('show');
   } else {
     S.retryCount++;
     if (!S.raw) loadSample();
-    setConn('sample','🟡 Sample data (configure proxy in Settings)');
-    if (!S.proxyUrl || S.retryCount > 2) {
-      document.getElementById('errBar').classList.add('show');
-    }
+    setConn('sample','🟠 SAMPLE — not live data');
+    const msg = S.proxyUrl
+      ? `Proxy ${S.proxyUrl.slice(0,40)}... not responding. Check Worker is deployed & URL is correct. Settings → Test Proxy.`
+      : `⚠️ SAMPLE DATA — numbers are fake. Deploy free Cloudflare Worker (5 min, in Settings) to get LIVE NSE data.`;
+    document.getElementById('errMsg').textContent = msg;
+    document.getElementById('errBar').classList.add('show');
   }
 
   busy(false);
@@ -1127,6 +1132,7 @@ function processData(json) {
   S.atm  = nearestATM(S.spot, S.symbol);
   const ts = rec.timestamp||'';
   document.getElementById('topSpot').textContent = n2(S.spot);
+  document.getElementById('topSpot').style.color = '';
   document.getElementById('topTs').textContent   = ts.split(' ').slice(0,2).join(' ')||'';
 
   const map={}, expSet=new Set();
@@ -1202,9 +1208,14 @@ function applyFilter() {
 
 function onSymChange() {
   S.symbol=document.getElementById('symSel').value;
-  S.expiry=''; // reset to get nearest expiry for new symbol
-  S.raw=null;
+  S.expiry=''; S.expiries=[]; S.raw=null;
   document.getElementById('topSymLbl').textContent=S.symbol;
+  const nseSel=document.getElementById('nseSymSel'); if(nseSel) nseSel.value=S.symbol;
+  // clear all expiry selectors immediately so old expiries vanish
+  ['expSel','chainExpSel','mpExpSel','nseExpSel','greekExpSel'].forEach(id=>{
+    const e=document.getElementById(id); if(e) e.innerHTML='<option>Loading...</option>';
+  });
+  localStorage.setItem('nop3_symbol',S.symbol);
   doFetch(true);
 }
 function onExpChange() { S.expiry=document.getElementById('expSel').value; applyFilter(); renderDashboard(); }
@@ -1610,7 +1621,34 @@ function saveCfg() {
   showSt('cfgSt','ok','✅ Saved! Testing now...');
   doFetch(true);
 }
-async function testConn(){showSt('cfgSt','info','🔄 Testing...');await doFetch(true);setTimeout(()=>{if(S.lastFetchOK)showSt('cfgSt','ok','✅ Live data connected!');else showSt('cfgSt','err','❌ Could not connect. Check proxy URL.');},2000);}
+async function testConn(){
+  const url=document.getElementById('sProxyUrl').value.trim();
+  const type=document.getElementById('sProxyType').value;
+  if(!url){showSt('cfgSt','err','❌ Paste your Worker URL first.');return;}
+  showSt('cfgSt','info','🔄 Testing proxy → NSE...');
+  const nseUrl='https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY';
+  let fullUrl;
+  if(type==='cloudflare') fullUrl=`${url.replace(/\/$/,'')}?url=${encodeURIComponent(nseUrl)}`;
+  else if(type==='render') fullUrl=`${url.replace(/\/$/,'')}/option-chain?symbol=NIFTY`;
+  else fullUrl=`${url}${encodeURIComponent(nseUrl)}`;
+  try{
+    const r=await fetchWithTimeout(fullUrl,{},10000);
+    if(!r.ok){showSt('cfgSt','err',`❌ HTTP ${r.status}. Worker reachable but NSE call failed. Re-deploy worker code.`);return;}
+    const txt=await r.text();
+    let j; try{j=JSON.parse(txt);}catch(e){showSt('cfgSt','err','❌ Got reply but not JSON. NSE may have blocked the worker IP. Try again in 30s.');return;}
+    if(j.contents){try{j=JSON.parse(j.contents);}catch(e){}}
+    if(j?.records?.underlyingValue){
+      showSt('cfgSt','ok',`✅ LIVE! NIFTY = ₹${j.records.underlyingValue}. Saving + activating now.`);
+      saveCfg();
+    } else if(j.error){
+      showSt('cfgSt','err',`❌ Worker error: ${j.error}`);
+    } else {
+      showSt('cfgSt','err','❌ Unexpected response. Check worker code matches the one in this page.');
+    }
+  } catch(e){
+    showSt('cfgSt','err',`❌ Cannot reach URL: ${e.message}. URL typo? Include https://. Worker deployed?`);
+  }
+}
 function saveGemini(){S.gemKey=document.getElementById('sGemKey').value.trim();S.gemModel=document.getElementById('sGemModel').value;['gemKey','gemModel'].forEach(k=>localStorage.setItem('nop3_'+k,S[k]));document.getElementById('aiModelBadge').textContent=S.gemModel;showSt('gemSt','ok','✅ Gemini configured!');}
 async function testGemini(){showSt('gemSt','info','🧪 Testing...');try{const r=await callGemini([{role:'user',parts:[{text:'Reply: NIFTY Gemini OK!'}]}]);showSt('gemSt','ok','✅ '+r.slice(0,80));}catch(e){showSt('gemSt','err','❌ '+e.message);}}
 
@@ -1623,11 +1661,13 @@ function copyCode(id){const t=document.getElementById(id).textContent;navigator.
 // SAMPLE DATA (varies by symbol)
 function loadSample() {
   const sym=S.symbol||'NIFTY';
-  const baseSpots={NIFTY:24576.60,BANKNIFTY:52280.50,FINNIFTY:23890.20,MIDCPNIFTY:12450.75};
-  const spot=baseSpots[sym]||24576.60;
+  // Realistic snapshot Nov 2025
+  const baseSpots={NIFTY:23643.50,BANKNIFTY:51420.30,FINNIFTY:23890.20,MIDCPNIFTY:12450.75,SENSEX:77580.00};
+  const spot=baseSpots[sym]||23643.50;
   S.spot=spot; S.atm=nearestATM(spot, sym);
   document.getElementById('topSpot').textContent=n2(spot);
-  document.getElementById('topTs').textContent='Sample';
+  document.getElementById('topTs').textContent='SAMPLE (not live)';
+  document.getElementById('topSpot').style.color='#f97316';
   const exps=[];const d=new Date();
   for(let i=0;i<8;i++){while(d.getDay()!==4)d.setDate(d.getDate()+1);exps.push(d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-'));d.setDate(d.getDate()+1);}
   S.expiries=exps;
