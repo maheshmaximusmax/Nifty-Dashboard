@@ -1621,7 +1621,11 @@ function renderAngelPositions(positions) {
   }).join('');
   // Angel metrics
   const totalPNL=positions.reduce((s,p)=>s+(+p.pnl||0),0);
-  const symbolLtp=(positions.find(p=>(p.tradingsymbol||'').includes(S.symbol))?.ltp)||S.spot;
+  const symbolLtp=(positions.find(p=>{
+    const t=(p.tradingsymbol||'').toUpperCase();
+    if(S.symbol==='NIFTY') return /\bNIFTY\b/.test(t) && !/\bBANKNIFTY\b/.test(t);
+    return t.includes(S.symbol);
+  })?.ltp)||S.spot;
   document.getElementById('angelMG').innerHTML=`
     <div class="angel-mc"><div class="lbl">Total P&L</div><div class="val ${totalPNL>=0?'cg':'cr'}">₹${totalPNL.toFixed(2)}</div></div>
     <div class="angel-mc"><div class="lbl">Positions</div><div class="val cb">${positions.length}</div></div>
@@ -1698,14 +1702,14 @@ function addMsg(role,text){const win=document.getElementById('chatWin');const d=
 function showThink(){const win=document.getElementById('chatWin');const d=document.createElement('div');d.id='thinkEl';d.className='msg msg-ai';d.innerHTML='<div class="thinking"><div class="d"></div><div class="d d2"></div><div class="d d3"></div></div>';win.appendChild(d);win.scrollTop=win.scrollHeight;return d;}
 function removeThink(el){el?.remove();}
 function localAIReply(msg, ctx){
-  const g=/[\u0A80-\u0AFF]/.test(msg);
+  const isGujarati=/[\u0A80-\u0AFF]/.test(msg);
   const pcrM=ctx.match(/PCR:\s*([0-9.]+)/i);
   const mpM=ctx.match(/Max Pain:\s*([0-9.]+)/i);
   const spotM=ctx.match(/Spot:\s*([0-9,]+\.[0-9]+)/i);
   const atmM=ctx.match(/ATM:\s*([0-9.]+)/i);
   const pcr=parseFloat(pcrM?.[1]||'0');
   const sent=pcr<0.8?'Bearish':pcr>1.2?'Bullish':'Neutral';
-  if(g){
+  if(isGujarati){
     return `🆓 Local AI Mode (Free)\nSymbol: ${S.symbol}\nSentiment: ${sent} (PCR ${pcr.toFixed(2)})\nSpot: ${spotM?.[1]||'—'} | ATM: ${atmM?.[1]||'—'} | Max Pain: ${mpM?.[1]||'—'}\n\nGujarati view:\n• PCR ${pcr.toFixed(2)} પ્રમાણે market ${sent.toLowerCase()} bias ma chhe.\n• Spot ne Max Pain vachche distance joi ne expiry magnet effect check karo.\n• Strategy idea: Neutral hoy to short strangle hedge sathe, bullish hoy to bull put spread, bearish hoy to bear call spread.\n\nNote: Gemini key add karsho to advanced AI response malse.`;
   }
   return `🆓 Local AI Mode (Free)\nSymbol: ${S.symbol}\nSentiment: ${sent} (PCR ${pcr.toFixed(2)})\nSpot: ${spotM?.[1]||'—'} | ATM: ${atmM?.[1]||'—'} | Max Pain: ${mpM?.[1]||'—'}\n\nQuick interpretation:\n- PCR + OI suggests ${sent.toLowerCase()} conditions.\n- Compare spot vs max pain for expiry pull.\n- Prefer hedged strategies: bull put spread (bullish), bear call spread (bearish), iron condor/strangle (neutral).\n\nAdd a Gemini free-tier key in Settings for deeper conversational analysis.`;
@@ -1716,8 +1720,13 @@ function localAIReply(msg, ctx){
 // ═══════════════════════════════════════════════
 function saveCfg() {
   S.cookie=document.getElementById('sCookie').value.trim();
-  S.proxy=document.getElementById('sProxy').value;
-  if(!S.proxy||S.proxy==='custom') S.proxy=PROXIES[0];
+  const proxySel=document.getElementById('sProxy').value;
+  if(proxySel==='custom'){
+    showSt('cfgSt','warn','⚠️ Custom proxy URL input is not configured yet. Using last working proxy.');
+  } else if(proxySel) {
+    S.proxy=proxySel;
+  }
+  if(!S.proxy) S.proxy=PROXIES[0];
   S.refreshSec=Math.min(300,Math.max(3,parseInt(document.getElementById('sInterval').value)||5));
   document.getElementById('sInterval').value=S.refreshSec;
   ['cookie','proxy','refreshSec'].forEach(k=>localStorage.setItem('nop_'+k,S[k]));
