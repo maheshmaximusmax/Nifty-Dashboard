@@ -332,12 +332,12 @@ table.at tr:hover td{background:rgba(255,255,255,.02)}
     <div class="logo-sub">Live • Auto-Refresh</div>
   </div>
   <div class="topbar-mid">
-    <div class="spot-box" title="NIFTY Spot">
-      <div><div class="spot-lbl">NIFTY</div><div class="spot-val" id="topSpot">—</div></div>
+    <div class="spot-box" title="Selected Symbol Spot">
+      <div><div class="spot-lbl" id="topSpotLbl">NIFTY</div><div class="spot-val" id="topSpot">—</div></div>
       <div><div class="spot-chg cg" id="topChg">—</div><div style="font-size:9px;color:rgba(255,255,255,.3)" id="topTs">—</div></div>
     </div>
-    <div class="spot-box" title="BANKNIFTY Spot" style="display:none" id="bnkBox">
-      <div><div class="spot-lbl">BANKNIFTY</div><div class="spot-val" id="bnkSpot">—</div></div>
+    <div class="spot-box" title="Live status and symbol" id="bnkBox">
+      <div><div class="spot-lbl" id="bnkLbl">LIVE</div><div class="spot-val" id="bnkSpot">—</div></div>
     </div>
     <div class="auto-cookie-indicator">
       <span class="conn-dot" id="connDot" title="Connection status"></span>
@@ -659,8 +659,8 @@ table.at tr:hover td{background:rgba(255,255,255,.02)}
         </div>
         <div style="overflow-x:auto;max-height:400px;overflow-y:auto">
           <table class="at" id="angelPortTable">
-            <thead><tr><th>Symbol</th><th>Buy/Sell</th><th>Qty</th><th>Avg</th><th>LTP</th><th>P&L</th><th>%P&L</th><th>Greeks Δ</th><th>Greeks Θ</th></tr></thead>
-            <tbody id="angelPortBody"><tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px">Connect Angel One to see positions</td></tr></tbody>
+            <thead><tr><th>Symbol</th><th>Buy/Sell</th><th>Qty</th><th>Avg</th><th>LTP</th><th>P&L</th><th>%P&L</th><th>Δ</th><th>Γ</th><th>Θ</th><th>ν</th></tr></thead>
+            <tbody id="angelPortBody"><tr><td colspan="11" style="text-align:center;color:var(--text3);padding:20px">Connect Angel One to see positions</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -718,7 +718,7 @@ table.at tr:hover td{background:rgba(255,255,255,.02)}
     <!-- NSE Cookie (Auto) -->
     <div class="sc">
       <h3>🍪 NSE Cookie <span>(Auto-Refresh)</span></h3>
-      <div class="alrt ao">⚡ <b>Auto-Cookie System:</b> The dashboard tries to auto-fetch NSE cookies via multiple CORS proxies. If all fail, manually paste your cookie below. Cookie auto-rotates every 5 minutes.</div>
+      <div class="alrt ao">⚡ <b>Auto-Cookie System:</b> The dashboard tries to auto-fetch NSE cookies via multiple CORS proxies. If all fail, manually paste your cookie below. Cookie auto-rotates every 4 minutes.</div>
       <div class="fr">
         <label>Manual NSE Cookie (optional — auto-fetched)</label>
         <textarea id="sCookie" rows="3" placeholder="Auto-fetched. Paste manually only if auto fails.&#10;F12 → Network → any nseindia.com request → copy cookie header"></textarea>
@@ -729,7 +729,7 @@ table.at tr:hover td{background:rgba(255,255,255,.02)}
         <select id="sProxy">
           <option value="https://api.allorigins.win/get?url=">allorigins.win (Default)</option>
           <option value="https://corsproxy.io/?">corsproxy.io</option>
-          <option value="https://cors-anywhere.herokuapp.com/">cors-anywhere</option>
+          <option value="https://api.codetabs.com/v1/proxy?quest=">api.codetabs.com</option>
           <option value="custom">Custom URL</option>
         </select>
       </div>
@@ -749,7 +749,7 @@ table.at tr:hover td{background:rgba(255,255,255,.02)}
     <!-- Gemini AI -->
     <div class="sc">
       <h3>🤖 Gemini AI <span>Configuration</span></h3>
-      <div class="alrt ai">Get FREE Gemini API key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a> — completely free to use! Works online from GitHub Pages.</div>
+      <div class="alrt ai">Use Gemini free tier from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>. If no key is added, chatbot auto-runs in free local analysis mode.</div>
       <div class="fr">
         <label>Google Gemini API Key</label>
         <input id="sGemKey" type="password" placeholder="AIzaSy...">
@@ -829,9 +829,10 @@ table.at tr:hover td{background:rgba(255,255,255,.02)}
 const S = {
   raw:null, filtered:[], expiries:[], expiry:'', symbol:'NIFTY',
   spot:0, atm:0, refreshTimer:null, refreshSec:5,
+  cookieTimer:null, angelTimer:null, isLive:false,
   cookie:'', proxy:'https://api.allorigins.win/get?url=',
   gemKey:'', gemModel:'gemini-2.0-flash',
-  angelKey:'', angelClientId:'', angelToken:'',
+  angelKey:'', angelClientId:'', angelMpin:'', angelToken:'', angelRefreshToken:'', angelFeedToken:'', angelLastAuthAt:0,
   angelConnected:false, angelData:{},
   charts:{}, chatHist:[], theme:'dark'
 };
@@ -848,14 +849,16 @@ const PROXIES = [
 window.addEventListener('DOMContentLoaded', () => {
   loadCfg();
   initClock();
+  syncSymbolUI();
   doFetch();
-  // Auto-cookie refresh every 4 minutes
-  setInterval(() => doFetch(), 4 * 60 * 1000);
+  S.cookieTimer = setInterval(() => rotateNSECookie(), 4 * 60 * 1000);
 });
 
 function loadCfg() {
-  const keys = ['cookie','proxy','refreshSec','gemKey','gemModel','angelKey','angelClientId','angelToken','angelConnected','theme'];
+  const keys = ['cookie','proxy','refreshSec','gemKey','gemModel','angelKey','angelClientId','angelMpin','angelToken','angelRefreshToken','angelFeedToken','angelLastAuthAt','angelConnected','theme','symbol'];
   keys.forEach(k => { const v = localStorage.getItem('nop_'+k); if(v!==null) S[k]=v; });
+  S.refreshSec = Math.min(300, Math.max(3, parseInt(S.refreshSec)||5));
+  S.angelLastAuthAt = parseInt(S.angelLastAuthAt)||0;
   // Restore form
   if(S.cookie)     document.getElementById('sCookie').value   = S.cookie;
   if(S.refreshSec) document.getElementById('sInterval').value = S.refreshSec;
@@ -863,12 +866,21 @@ function loadCfg() {
   if(S.gemModel)   document.getElementById('sGemModel').value = S.gemModel;
   if(S.angelKey)   document.getElementById('aApiKey').value   = S.angelKey;
   if(S.angelClientId) document.getElementById('aClientId').value = S.angelClientId;
+  if(S.angelMpin) document.getElementById('aMpin').value = S.angelMpin;
+  if(S.symbol){
+    const symSel=document.getElementById('symSel');
+    const nseSymSel=document.getElementById('nseSymSel');
+    if(symSel) symSel.value=S.symbol;
+    if(nseSymSel) nseSymSel.value=S.symbol;
+  }
   // Theme
   applyTheme(S.theme);
   document.getElementById('aiModelBadge').textContent = S.gemModel || '—';
   if(S.angelConnected==='true') {
+    S.angelConnected=true;
     document.getElementById('angelNotConn').style.display='none';
     document.getElementById('angelConn').style.display='block';
+    startAngelAutoRefresh();
   }
 }
 
@@ -914,60 +926,120 @@ function goTab(el, id) {
 // ═══════════════════════════════════════════════
 //  FETCH — AUTO COOKIE
 // ═══════════════════════════════════════════════
+function syncSymbolUI() {
+  setText('topSpotLbl', S.symbol || 'NIFTY');
+  setText('bnkLbl', `${S.symbol || 'NIFTY'} MODE`);
+  setText('bnkSpot', S.isLive ? 'LIVE' : 'SAMPLE');
+  const symSel=document.getElementById('symSel');
+  const nseSymSel=document.getElementById('nseSymSel');
+  if(symSel && symSel.value!==S.symbol) symSel.value=S.symbol;
+  if(nseSymSel && nseSymSel.value!==S.symbol) nseSymSel.value=S.symbol;
+}
+
+function parseProxyJson(raw) {
+  if(raw===null||raw===undefined) return null;
+  if(typeof raw === 'string'){
+    const txt=raw.trim();
+    if(!txt) return null;
+    try { return JSON.parse(txt); } catch(e){ return null; }
+  }
+  if(raw.contents) return parseProxyJson(raw.contents);
+  if(raw.body) return parseProxyJson(raw.body);
+  if(raw.data?.records) return raw.data;
+  return raw;
+}
+
+async function fetchViaProxy(targetUrl, proxy, cookie) {
+  const proxyUrl = proxy + encodeURIComponent(targetUrl);
+  const headers = {'Accept':'application/json,text/plain,*/*'};
+  if(cookie) headers['Cookie'] = cookie;
+  const r = await Promise.race([
+    fetch(proxyUrl, {headers}),
+    new Promise((_,rej) => setTimeout(()=>rej(new Error('timeout')), 9000))
+  ]);
+  if (!r.ok) throw new Error('HTTP '+r.status);
+  const rawText = await r.text();
+  let wrapper = null;
+  try { wrapper = JSON.parse(rawText); } catch(e){ wrapper = rawText; }
+  const parsed = parseProxyJson(wrapper);
+  if(!parsed) throw new Error('Invalid payload');
+  return parsed;
+}
+
+async function tryFetchNSE(nseUrl, proxies, cookie) {
+  const attempts = proxies.map(proxy =>
+    fetchViaProxy(nseUrl, proxy, cookie || '').then(data => {
+      if (!data?.records?.data?.length) throw new Error('No records');
+      return {data, proxy};
+    })
+  );
+  try {
+    const best = await Promise.any(attempts);
+    S.proxy = best.proxy;
+    localStorage.setItem('nop_proxy', best.proxy);
+    return best.data;
+  } catch(e) {
+    return null;
+  }
+}
+
+async function rotateNSECookie() {
+  const sessionUrl = 'https://www.nseindia.com/option-chain';
+  for (const proxy of PROXIES) {
+    try {
+      await fetchViaProxy(sessionUrl, proxy, '');
+      S.proxy = proxy;
+      localStorage.setItem('nop_proxy', proxy);
+      return true;
+    } catch(e){}
+  }
+  return false;
+}
+
 async function doFetch() {
   busy(true);
-  const sym = document.getElementById('symSel').value; S.symbol = sym;
+  const sym = document.getElementById('symSel').value;
+  S.symbol = sym;
+  localStorage.setItem('nop_symbol', S.symbol);
+  syncSymbolUI();
   const nseUrl = `https://www.nseindia.com/api/option-chain-indices?symbol=${sym}`;
 
   let json = null;
+  const preferredProxies = [S.proxy, ...PROXIES].filter((v,i,a)=>v&&a.indexOf(v)===i);
 
   // 1. Try with user cookie first (most reliable)
   if (S.cookie) {
-    try { json = await tryFetch(nseUrl, S.proxy, S.cookie); } catch(e){}
+    json = await tryFetchNSE(nseUrl, preferredProxies, S.cookie);
   }
 
-  // 2. Auto-cookie: try each proxy without cookie
+  // 2. Try each proxy without cookie
   if (!json) {
-    for (const proxy of PROXIES) {
-      try { json = await tryFetch(nseUrl, proxy, ''); if(json) break; } catch(e){}
-    }
+    json = await tryFetchNSE(nseUrl, preferredProxies, '');
   }
 
   // 3. Try auto-getting a session first, then fetch
   if (!json) {
-    try {
-      const sessionUrl = 'https://www.nseindia.com/';
-      await tryFetch(sessionUrl, PROXIES[0], '');
-      json = await tryFetch(nseUrl, PROXIES[0], '');
-    } catch(e){}
+    await rotateNSECookie();
+    json = await tryFetchNSE(nseUrl, preferredProxies, '');
   }
 
   if (json && json.records?.data) {
     processData(json);
+    S.isLive = true;
     setConn('live','🟢 Live NSE Data');
+    setText('errMsg', 'Live streaming connected.');
     document.getElementById('errBar').classList.remove('show');
   } else {
     loadSample();
+    S.isLive = false;
     setConn('sample','🟡 Sample Data (add cookie for live)');
+    setText('errMsg', 'NSE live fetch blocked. Showing realistic sample data. Trying auto-cookie and proxy fallback.');
     document.getElementById('errBar').classList.add('show');
   }
+  syncSymbolUI();
 
   busy(false);
   scheduleNext();
-}
-
-async function tryFetch(nseUrl, proxy, cookie) {
-  const proxyUrl = proxy + encodeURIComponent(nseUrl);
-  const opts = { headers:{'Accept':'application/json,*/*'} };
-  if(cookie) opts.headers['Cookie'] = cookie;
-  const r = await Promise.race([
-    fetch(proxyUrl, opts),
-    new Promise((_,rej) => setTimeout(()=>rej(new Error('timeout')), 8000))
-  ]);
-  if (!r.ok) throw new Error('HTTP '+r.status);
-  const wrapper = await r.json();
-  const content = wrapper.contents || wrapper.body || wrapper;
-  return typeof content === 'string' ? JSON.parse(content) : content;
 }
 
 function setConn(type, lbl) {
@@ -983,7 +1055,9 @@ function busy(v) {
 
 function scheduleNext() {
   if(S.refreshTimer) clearTimeout(S.refreshTimer);
-  S.refreshTimer = setTimeout(doFetch, (parseInt(S.refreshSec)||5)*1000);
+  const sec = Math.min(300, Math.max(3, parseInt(S.refreshSec)||5));
+  S.refreshSec = sec;
+  S.refreshTimer = setTimeout(doFetch, sec*1000);
 }
 
 // ═══════════════════════════════════════════════
@@ -1010,7 +1084,18 @@ function processData(json) {
   if(!S.expiry||!S.expiries.includes(S.expiry)) S.expiry = S.expiries[0]||'';
   populateExpSelects();
   applyFilter();
+  renderAllTabs();
+}
+
+function renderAllTabs() {
   renderDashboard();
+  renderNSE();
+  renderChain();
+  renderOI();
+  renderMP();
+  renderHeatmap();
+  renderGreeks();
+  updateAICtx();
 }
 
 function nearestATM(spot) {
@@ -1064,7 +1149,7 @@ function applyFilter() {
   updateAICtx();
 }
 
-function onSymChange() { S.symbol=document.getElementById('symSel').value; doFetch(); }
+function onSymChange() { S.symbol=document.getElementById('symSel').value; syncSymbolUI(); doFetch(); }
 function onExpChange() { S.expiry=document.getElementById('expSel').value; applyFilter(); renderDashboard(); }
 
 // ═══════════════════════════════════════════════
@@ -1405,44 +1490,107 @@ async function connectAngel() {
   const clientId=document.getElementById('aClientId').value.trim();
   const mpin=document.getElementById('aMpin').value.trim();
   const totp=document.getElementById('aTotp').value.trim();
-  if(!key||!clientId){showSt('angelSt','err','❌ API Key and Client ID required.');return;}
+  if(!key||!clientId||!mpin||!totp){showSt('angelSt','err','❌ API Key, Client ID, MPIN and TOTP are required.');return;}
   showSt('angelSt','info','🔄 Connecting to Angel One...');
   try {
-    // Angel SmartAPI login
-    const loginRes=await fetch('https://apiconnect.angelbroking.com/rest/auth/angelbroking/user/v1/loginByPassword',{
+    const loginData=await angelCall('https://apiconnect.angelone.in/rest/auth/angelbroking/user/v1/loginByPassword',{
       method:'POST',
-      headers:{'Content-Type':'application/json','X-UserType':'USER','X-SourceID':'WEB','X-ClientLocalIP':'192.168.1.1','X-ClientPublicIP':'106.193.147.98','X-MACAddress':'fe80::216','X-PrivateKey':key},
-      body:JSON.stringify({clientcode:clientId,password:mpin,totp:totp||''})
-    });
-    const loginData=await loginRes.json();
+      body:{clientcode:clientId,password:mpin,totp}
+    }, key);
     if(loginData.status&&loginData.data?.jwtToken){
       S.angelToken=loginData.data.jwtToken;
-      S.angelConnected=true; S.angelKey=key; S.angelClientId=clientId;
+      S.angelRefreshToken=loginData.data.refreshToken||'';
+      S.angelFeedToken=loginData.data.feedToken||'';
+      S.angelLastAuthAt=Date.now();
+      S.angelConnected=true; S.angelKey=key; S.angelClientId=clientId; S.angelMpin=mpin;
       localStorage.setItem('nop_angelToken',S.angelToken);
+      localStorage.setItem('nop_angelRefreshToken',S.angelRefreshToken);
+      localStorage.setItem('nop_angelFeedToken',S.angelFeedToken);
+      localStorage.setItem('nop_angelLastAuthAt',String(S.angelLastAuthAt));
       localStorage.setItem('nop_angelConnected','true');
       localStorage.setItem('nop_angelKey',key);
       localStorage.setItem('nop_angelClientId',clientId);
-      showSt('angelSt','ok','✅ Angel One connected! Token acquired.');
+      localStorage.setItem('nop_angelMpin',mpin);
+      showSt('angelSt','ok','✅ Angel One connected! Live token acquired.');
       document.getElementById('angelNotConn').style.display='none';
       document.getElementById('angelConn').style.display='block';
-      fetchAngelPositions();
+      startAngelAutoRefresh();
+      await fetchAngelPositions();
     } else {
       showSt('angelSt','err','❌ Login failed: '+(loginData.message||JSON.stringify(loginData)));
     }
   } catch(e) {
-    showSt('angelSt','err','❌ Connection error: '+e.message+'. Check CORS — may need backend for Angel API.');
+    showSt('angelSt','err','❌ Connection error: '+e.message);
   }
 }
 
+function angelHeaders(key, auth=false) {
+  const h={'Content-Type':'application/json','Accept':'application/json','X-UserType':'USER','X-SourceID':'WEB','X-ClientLocalIP':'127.0.0.1','X-ClientPublicIP':'127.0.0.1','X-MACAddress':'00:00:00:00:00:00','X-PrivateKey':key||S.angelKey};
+  if(auth&&S.angelToken) h['Authorization']='Bearer '+S.angelToken;
+  return h;
+}
+
+async function angelCall(url, opts={}, key='') {
+  const method=opts.method||'GET';
+  const req={method,headers:angelHeaders(key, !!opts.auth)};
+  if(opts.body) req.body=JSON.stringify(opts.body);
+  const tries=[
+    async()=>parseProxyJson(await (await fetch(url,req)).json()),
+    async()=>parseProxyJson(await (await fetch('https://corsproxy.io/?'+encodeURIComponent(url),req)).json()),
+    async()=>parseProxyJson(await (await fetch('https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url),req)).json())
+  ];
+  let lastErr;
+  for(const t of tries){
+    try{
+      const data=await t();
+      if(data&&typeof data==='object') return data;
+    }catch(e){lastErr=e;}
+  }
+  throw lastErr||new Error('Angel API request failed');
+}
+
+async function refreshAngelToken() {
+  if(!S.angelRefreshToken) return false;
+  try{
+    const data=await angelCall('https://apiconnect.angelone.in/rest/auth/angelbroking/jwt/v1/generateTokens',{
+      method:'POST',
+      body:{refreshToken:S.angelRefreshToken}
+    }, S.angelKey);
+    if(data.status&&data.data?.jwtToken){
+      S.angelToken=data.data.jwtToken;
+      S.angelRefreshToken=data.data.refreshToken||S.angelRefreshToken;
+      S.angelFeedToken=data.data.feedToken||S.angelFeedToken;
+      S.angelLastAuthAt=Date.now();
+      localStorage.setItem('nop_angelToken',S.angelToken);
+      localStorage.setItem('nop_angelRefreshToken',S.angelRefreshToken);
+      localStorage.setItem('nop_angelFeedToken',S.angelFeedToken);
+      localStorage.setItem('nop_angelLastAuthAt',String(S.angelLastAuthAt));
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
 async function fetchAngelPositions() {
-  if(!S.angelToken){return;}
+  if(!S.angelConnected||!S.angelToken){return;}
   try {
-    const r=await fetch('https://apiconnect.angelbroking.com/rest/secure/angelbroking/order/v1/getPosition',{
-      headers:{'Authorization':'Bearer '+S.angelToken,'Content-Type':'application/json','X-UserType':'USER','X-SourceID':'WEB','X-PrivateKey':S.angelKey}
-    });
-    const data=await r.json();
-    if(data.status&&data.data){renderAngelPositions(data.data);}
+    const data=await angelCall('https://apiconnect.angelone.in/rest/secure/angelbroking/order/v1/getPosition',{auth:true});
+    if(data.status&&data.data){renderAngelPositions(data.data);return;}
+    const msg=(data.message||'').toLowerCase();
+    if(msg.includes('token')||msg.includes('jwt')){
+      const ok=await refreshAngelToken();
+      if(ok){
+        const retry=await angelCall('https://apiconnect.angelone.in/rest/secure/angelbroking/order/v1/getPosition',{auth:true});
+        if(retry.status&&retry.data){renderAngelPositions(retry.data);return;}
+      }
+      showSt('angelSt','warn','⚠️ Angel token expired. Reconnect with fresh TOTP.');
+    }
   } catch(e){console.warn('Angel positions fetch error:',e);}
+}
+
+function startAngelAutoRefresh() {
+  if(S.angelTimer) clearInterval(S.angelTimer);
+  S.angelTimer=setInterval(fetchAngelPositions,2000);
 }
 
 function renderAngelPositions(positions) {
@@ -1451,15 +1599,15 @@ function renderAngelPositions(positions) {
   document.getElementById('angelPortBody').innerHTML=positions.map(p=>{
     const pnl=(p.pnl||0),avgPrice=+(p.averageprice||0),ltp=+(p.ltp||0);
     const pct=avgPrice?(((ltp-avgPrice)/avgPrice)*100).toFixed(2):0;
-    let delta='—',theta='—';
+    let delta='—',gamma='—',theta='—',vega='—';
     // Try to compute greeks if it's an option
     if(p.optiontype&&p.expirydate&&p.strikeprice&&p.lotsize){
       try{
         const exp=new Date(p.expirydate);
         const T=Math.max(0.001,(exp-Date.now())/(1000*86400*365));
-        const sigma=0.15; // estimated
+        const sigma=Math.max(0.08,((+p.impliedvolatility||15)/100));
         const g=bsGreeks(spot,+p.strikeprice,T,r,sigma,p.optiontype);
-        delta=g.delta; theta=g.theta;
+        delta=g.delta; gamma=g.gamma; theta=g.theta; vega=g.vega;
       }catch(e){}
     }
     return `<tr>
@@ -1470,18 +1618,27 @@ function renderAngelPositions(positions) {
       <td style="font-weight:600">${ltp.toFixed(2)}</td>
       <td class="${pnl>=0?'cg':'cr'}" style="font-weight:700">₹${(+pnl).toFixed(2)}</td>
       <td class="${pct>=0?'cg':'cr'}">${pct}%</td>
-      <td>${delta}</td><td>${theta}</td>
+      <td>${delta}</td><td>${gamma}</td><td>${theta}</td><td>${vega}</td>
     </tr>`;
   }).join('');
   // Angel metrics
   const totalPNL=positions.reduce((s,p)=>s+(+p.pnl||0),0);
+  const symbolLtp=(positions.find(p=>(p.tradingsymbol||'').includes(S.symbol))?.ltp)||S.spot;
   document.getElementById('angelMG').innerHTML=`
     <div class="angel-mc"><div class="lbl">Total P&L</div><div class="val ${totalPNL>=0?'cg':'cr'}">₹${totalPNL.toFixed(2)}</div></div>
     <div class="angel-mc"><div class="lbl">Positions</div><div class="val cb">${positions.length}</div></div>
     <div class="angel-mc"><div class="lbl">Winning</div><div class="val cg">${positions.filter(p=>p.pnl>0).length}</div></div>
-    <div class="angel-mc"><div class="lbl">Losing</div><div class="val cr">${positions.filter(p=>p.pnl<0).length}</div></div>`;
+    <div class="angel-mc"><div class="lbl">Losing</div><div class="val cr">${positions.filter(p=>p.pnl<0).length}</div></div>
+    <div class="angel-mc"><div class="lbl">${S.symbol} LTP</div><div class="val cb">₹${(+symbolLtp||0).toFixed(2)}</div></div>`;
 }
-function disconnectAngel(){S.angelToken='';S.angelConnected=false;localStorage.removeItem('nop_angelToken');localStorage.removeItem('nop_angelConnected');document.getElementById('angelNotConn').style.display='block';document.getElementById('angelConn').style.display='none';showSt('angelSt','info','Disconnected.');}
+function disconnectAngel(){
+  S.angelToken='';S.angelRefreshToken='';S.angelFeedToken='';S.angelConnected=false;
+  if(S.angelTimer) clearInterval(S.angelTimer);
+  ['angelToken','angelRefreshToken','angelFeedToken','angelConnected'].forEach(k=>localStorage.removeItem('nop_'+k));
+  document.getElementById('angelNotConn').style.display='block';
+  document.getElementById('angelConn').style.display='none';
+  showSt('angelSt','info','Disconnected.');
+}
 
 // ═══════════════════════════════════════════════
 //  GEMINI AI CHAT
@@ -1510,9 +1667,10 @@ async function sendChat() {
   addMsg('user',msg);
   const think=showThink();
   const ctx=document.getElementById('aiCtx').textContent;
-  S.chatHist.push({role:'user',parts:[{text:`You are an expert Indian stock market analyst. You know Gujarati and English. Answer in the same language the user writes in. Current NIFTY option chain data:\n${ctx}\n\nUser question: ${msg}`}]});
+  const promptText=`You are an expert Indian stock market analyst. You know Gujarati and English. Answer in the same language the user writes in. Current option chain data:\n${ctx}\n\nUser question: ${msg}`;
+  S.chatHist.push({role:'user',parts:[{text:promptText}]});
   try {
-    const reply=await callGemini(S.chatHist);
+    const reply=S.gemKey ? await callGemini(S.chatHist) : localAIReply(msg, ctx);
     removeThink(think);
     addMsg('ai',reply);
     // Keep assistant reply in history
@@ -1521,7 +1679,7 @@ async function sendChat() {
     if(S.chatHist.length>20)S.chatHist=S.chatHist.slice(-20);
   } catch(e) {
     removeThink(think);
-    addMsg('ai','❌ '+e.message+'\n\nSettings → AI (Gemini) → Add your Google Gemini API key (free at aistudio.google.com)');
+    addMsg('ai','❌ '+e.message+'\n\nTip: Add Gemini free-tier key in Settings, or continue using built-in free local analysis mode.');
   }
 }
 
@@ -1541,6 +1699,19 @@ function clearChat(){S.chatHist=[];document.getElementById('chatWin').innerHTML=
 function addMsg(role,text){const win=document.getElementById('chatWin');const d=document.createElement('div');d.className='msg msg-'+role;d.innerHTML=`<div class="msg-lbl">${role==='user'?'YOU':'GEMINI AI'}</div><div class="msg-bub">${text.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;win.appendChild(d);win.scrollTop=win.scrollHeight;}
 function showThink(){const win=document.getElementById('chatWin');const d=document.createElement('div');d.id='thinkEl';d.className='msg msg-ai';d.innerHTML='<div class="thinking"><div class="d"></div><div class="d d2"></div><div class="d d3"></div></div>';win.appendChild(d);win.scrollTop=win.scrollHeight;return d;}
 function removeThink(el){el?.remove();}
+function localAIReply(msg, ctx){
+  const g=/[\u0A80-\u0AFF]/.test(msg);
+  const pcrM=ctx.match(/PCR:\s*([0-9.]+)/i);
+  const mpM=ctx.match(/Max Pain:\s*([0-9.]+)/i);
+  const spotM=ctx.match(/Spot:\s*([0-9,]+\.[0-9]+)/i);
+  const atmM=ctx.match(/ATM:\s*([0-9.]+)/i);
+  const pcr=parseFloat(pcrM?.[1]||'0');
+  const sent=pcr<0.8?'Bearish':pcr>1.2?'Bullish':'Neutral';
+  if(g){
+    return `🆓 Local AI Mode (Free)\nSymbol: ${S.symbol}\nSentiment: ${sent} (PCR ${pcr.toFixed(2)})\nSpot: ${spotM?.[1]||'—'} | ATM: ${atmM?.[1]||'—'} | Max Pain: ${mpM?.[1]||'—'}\n\nGujarati view:\n• PCR ${pcr.toFixed(2)} પ્રમાણે market ${sent.toLowerCase()} bias ma chhe.\n• Spot ne Max Pain vachche distance joi ne expiry magnet effect check karo.\n• Strategy idea: Neutral hoy to short strangle hedge sathe, bullish hoy to bull put spread, bearish hoy to bear call spread.\n\nNote: Gemini key add karsho to advanced AI response malse.`;
+  }
+  return `🆓 Local AI Mode (Free)\nSymbol: ${S.symbol}\nSentiment: ${sent} (PCR ${pcr.toFixed(2)})\nSpot: ${spotM?.[1]||'—'} | ATM: ${atmM?.[1]||'—'} | Max Pain: ${mpM?.[1]||'—'}\n\nQuick interpretation:\n- PCR + OI suggests ${sent.toLowerCase()} conditions.\n- Compare spot vs max pain for expiry pull.\n- Prefer hedged strategies: bull put spread (bullish), bear call spread (bearish), iron condor/strangle (neutral).\n\nAdd a Gemini free-tier key in Settings for deeper conversational analysis.`;
+}
 
 // ═══════════════════════════════════════════════
 //  SETTINGS
@@ -1548,14 +1719,16 @@ function removeThink(el){el?.remove();}
 function saveCfg() {
   S.cookie=document.getElementById('sCookie').value.trim();
   S.proxy=document.getElementById('sProxy').value;
-  S.refreshSec=document.getElementById('sInterval').value;
+  if(!S.proxy||S.proxy==='custom') S.proxy=PROXIES[0];
+  S.refreshSec=Math.min(300,Math.max(3,parseInt(document.getElementById('sInterval').value)||5));
+  document.getElementById('sInterval').value=S.refreshSec;
   ['cookie','proxy','refreshSec'].forEach(k=>localStorage.setItem('nop_'+k,S[k]));
   showSt('cfgSt','ok','✅ Saved! Reconnecting...');
   doFetch();
 }
-async function testConn(){showSt('cfgSt','info','🔄 Testing...');await doFetch();if(S.raw&&document.getElementById('errBar').className.indexOf('show')===-1)showSt('cfgSt','ok','✅ Live data connected!');else showSt('cfgSt','err','❌ Using sample data. Add NSE cookie for live.');}
+async function testConn(){showSt('cfgSt','info','🔄 Testing...');await doFetch();if(S.raw&&S.isLive)showSt('cfgSt','ok','✅ Live data connected!');else showSt('cfgSt','warn','⚠️ Using sample data. Auto-retry is active across all proxies.');}
 function clearCookieCache(){S.cookie='';document.getElementById('sCookie').value='';localStorage.removeItem('nop_cookie');showSt('cfgSt','info','Cache cleared. Using auto-fetch.');}
-function saveGemini(){S.gemKey=document.getElementById('sGemKey').value.trim();S.gemModel=document.getElementById('sGemModel').value;['gemKey','gemModel'].forEach(k=>localStorage.setItem('nop_'+k,S[k]));document.getElementById('aiModelBadge').textContent=S.gemModel;showSt('gemSt','ok','✅ Gemini AI configured!');}
+function saveGemini(){S.gemKey=document.getElementById('sGemKey').value.trim();S.gemModel=document.getElementById('sGemModel').value;['gemKey','gemModel'].forEach(k=>localStorage.setItem('nop_'+k,S[k]));document.getElementById('aiModelBadge').textContent=S.gemModel;if(S.gemKey)showSt('gemSt','ok','✅ Gemini AI configured!');else showSt('gemSt','info','🆓 No key saved. Free local AI mode remains active.');}
 async function testGemini(){showSt('gemSt','info','🧪 Testing Gemini...');try{const r=await callGemini([{role:'user',parts:[{text:'Reply with exactly: NIFTY Gemini OK!'}]}]);showSt('gemSt','ok','✅ Gemini works: '+r.slice(0,50));}catch(e){showSt('gemSt','err','❌ '+e.message);}}
 
 function showSt(id,type,msg){const cls={ok:'ag',err:'ae',info:'ai',warn:'ao'}[type];const el=document.getElementById(id);if(el){el.innerHTML=`<div class="alrt ${cls}">${msg}</div>`;if(type==='ok')setTimeout(()=>{if(el)el.innerHTML='';},5000);}}
@@ -1597,7 +1770,7 @@ function loadSample() {
   S.raw={map}; S.expiry=exps[0];
   populateExpSelects();
   applyFilter();
-  renderDashboard();
+  renderAllTabs();
 }
 
 // ═══════════════════════════════════════════════
