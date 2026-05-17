@@ -832,7 +832,7 @@ const S = {
   cookieTimer:null, angelTimer:null, isLive:false,
   cookie:'', proxy:'https://api.allorigins.win/get?url=',
   gemKey:'', gemModel:'gemini-2.0-flash',
-  angelKey:'', angelClientId:'', angelMpin:'', angelToken:'', angelRefreshToken:'', angelFeedToken:'', angelLastAuthAt:0,
+  angelKey:'', angelClientId:'', angelToken:'', angelRefreshToken:'', angelFeedToken:'', angelLastAuthAt:0,
   angelConnected:false, angelData:{},
   charts:{}, chatHist:[], theme:'dark'
 };
@@ -855,7 +855,7 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 function loadCfg() {
-  const keys = ['cookie','proxy','refreshSec','gemKey','gemModel','angelKey','angelClientId','angelMpin','angelToken','angelRefreshToken','angelFeedToken','angelLastAuthAt','angelConnected','theme','symbol'];
+  const keys = ['cookie','proxy','refreshSec','gemKey','gemModel','angelKey','angelClientId','angelToken','angelRefreshToken','angelFeedToken','angelLastAuthAt','angelConnected','theme','symbol'];
   keys.forEach(k => { const v = localStorage.getItem('nop_'+k); if(v!==null) S[k]=v; });
   S.refreshSec = Math.min(300, Math.max(3, parseInt(S.refreshSec)||5));
   S.angelLastAuthAt = parseInt(S.angelLastAuthAt)||0;
@@ -866,7 +866,6 @@ function loadCfg() {
   if(S.gemModel)   document.getElementById('sGemModel').value = S.gemModel;
   if(S.angelKey)   document.getElementById('aApiKey').value   = S.angelKey;
   if(S.angelClientId) document.getElementById('aClientId').value = S.angelClientId;
-  if(S.angelMpin) document.getElementById('aMpin').value = S.angelMpin;
   if(S.symbol){
     const symSel=document.getElementById('symSel');
     const nseSymSel=document.getElementById('nseSymSel');
@@ -1502,7 +1501,7 @@ async function connectAngel() {
       S.angelRefreshToken=loginData.data.refreshToken||'';
       S.angelFeedToken=loginData.data.feedToken||'';
       S.angelLastAuthAt=Date.now();
-      S.angelConnected=true; S.angelKey=key; S.angelClientId=clientId; S.angelMpin=mpin;
+      S.angelConnected=true; S.angelKey=key; S.angelClientId=clientId;
       localStorage.setItem('nop_angelToken',S.angelToken);
       localStorage.setItem('nop_angelRefreshToken',S.angelRefreshToken);
       localStorage.setItem('nop_angelFeedToken',S.angelFeedToken);
@@ -1510,7 +1509,6 @@ async function connectAngel() {
       localStorage.setItem('nop_angelConnected','true');
       localStorage.setItem('nop_angelKey',key);
       localStorage.setItem('nop_angelClientId',clientId);
-      localStorage.setItem('nop_angelMpin',mpin);
       showSt('angelSt','ok','✅ Angel One connected! Live token acquired.');
       document.getElementById('angelNotConn').style.display='none';
       document.getElementById('angelConn').style.display='block';
@@ -1525,7 +1523,7 @@ async function connectAngel() {
 }
 
 function angelHeaders(key, auth=false) {
-  const h={'Content-Type':'application/json','Accept':'application/json','X-UserType':'USER','X-SourceID':'WEB','X-ClientLocalIP':'127.0.0.1','X-ClientPublicIP':'127.0.0.1','X-MACAddress':'00:00:00:00:00:00','X-PrivateKey':key||S.angelKey};
+  const h={'Content-Type':'application/json','Accept':'application/json','X-UserType':'USER','X-SourceID':'WEB','X-PrivateKey':key||S.angelKey};
   if(auth&&S.angelToken) h['Authorization']='Bearer '+S.angelToken;
   return h;
 }
