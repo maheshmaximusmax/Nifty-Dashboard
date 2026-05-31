@@ -925,7 +925,7 @@ gunicorn</div>
 const S = {
   raw:null, filtered:[], expiries:[], expiry:'', symbol:'NIFTY',
   spot:0, atm:0, refreshTimer:null, refreshSec:5,
-  proxyUrl:'', proxyType:'cloudflare',
+  proxyUrl:'', proxyType:'render',
   gemKey:'', gemModel:'gemini-2.0-flash',
   angelKey:'', angelClientId:'', angelToken:'',
   angelConnected:false,
@@ -1023,17 +1023,8 @@ async function doFetch(manual=false) {
   // Build NSE URL for current symbol
   const nseUrl = `https://www.nseindia.com/api/option-chain-indices?symbol=${sym}`;
 
-  // STRATEGY 0: Same-origin (local proxy)
-  try {
-    const r0 = await fetchWithTimeout("/option-chain?symbol="+sym, {}, 10000);
-    if (r0.ok) {
-      const p0 = await r0.json();
-      if (p0 && p0.records && p0.records.data) { json = p0; source = "local-proxy"; }
-    }
-  } catch(e0){}
-
-  // STRATEGY 1: User proxy
-  if (!json && S.proxyUrl) {
+  // STRATEGY 1: User's backend proxy (best)
+  if (S.proxyUrl) {
     try {
       let proxyFullUrl;
       if (S.proxyType === 'cloudflare') {
