@@ -352,31 +352,15 @@ table.gt td:first-child,table.gt th:first-child,table.pt td:first-child,table.pt
   <div class="set-wrap">
     <div class="sc" style="grid-column:1/-1">
       <h3>📡 Backend <span>(required — handles Groww + Angel One auth)</span></h3>
-      <div class="alrt ao">Browser can't safely hold broker secrets or do checksum/TOTP login. Deploy the backend once on Render.com (free) — see deploy steps at bottom of this page.</div>
-      <div class="fr"><label>Backend URL</label><input id="sBackend" placeholder="https://your-app.onrender.com"></div>
+      <div class="alrt ao">Browser can't safely hold broker secrets or do checksum/TOTP login — a backend is required. Run it on Render, your phone (Termux), or a laptop + ngrok tunnel; all use the same files.</div>
+      <div class="fr"><label>Backend URL</label><input id="sBackend" placeholder="https://your-backend-url"></div>
       <div style="display:flex;gap:8px"><button class="btn" onclick="saveBackend()">💾 Save</button><button class="btn-outline" onclick="testBackend()">🔬 Test Connection</button></div>
       <div id="backendSt" style="margin-top:10px"></div>
     </div>
 
-    <div class="sc">
-      <h3>🟢 Groww <span>credentials</span></h3>
-      <div class="alrt ai">These are NOT entered here — they live as environment variables on your Render backend (so the dashboard needs zero daily logins). This panel is just a reminder of what to set.</div>
-      <table class="gt"><tbody>
-        <tr><td>GROWW_API_KEY</td><td>From groww.in/trade-api/api-keys</td></tr>
-        <tr><td>GROWW_TOTP_SECRET</td><td>"Generate TOTP Token" on same page</td></tr>
-        <tr><td>GROWW_SECRET</td><td>Only if skipping TOTP, use checksum flow</td></tr>
-      </tbody></table>
-    </div>
-
-    <div class="sc">
-      <h3>🔥 Angel One <span>credentials</span></h3>
-      <div class="alrt ai">Same idea — set as Render env vars, not here.</div>
-      <table class="gt"><tbody>
-        <tr><td>ANGEL_API_KEY</td><td>smartapi.angelone.in</td></tr>
-        <tr><td>ANGEL_CLIENT_ID</td><td>Your login ID</td></tr>
-        <tr><td>ANGEL_MPIN</td><td>4-digit PIN</td></tr>
-        <tr><td>ANGEL_TOTP_SECRET</td><td>App → Profile → Security → TOTP</td></tr>
-      </tbody></table>
+    <div class="sc" style="grid-column:1/-1">
+      <h3>🔑 Groww + Angel One keys</h3>
+      <div class="alrt ai">Enter these at <code>[Backend URL]/setup</code> — not here. That page has labeled fields, Save, and Test buttons for both brokers.</div>
     </div>
 
     <div class="sc">
@@ -392,8 +376,8 @@ table.gt td:first-child,table.gt th:first-child,table.pt td:first-child,table.pt
       <h3>⚠️ Honest notes <span>read before you rely on this</span></h3>
       <ul style="font-size:11.5px;color:var(--text2);line-height:1.7;padding-left:18px">
         <li>Groww doesn't publish change-in-OI per strike — this dashboard computes it itself from the first poll of the day, stored in your browser. It's "change since you opened the dashboard today," not "change since yesterday's close" like NSE's site shows. Reload mid-day and the baseline resets.</li>
-        <li>Groww's API-key+secret/TOTP login flows say they "require daily approval" on Groww's own API keys page — if the backend ever reports a Groww auth failure, that's the first thing to check, it's a Groww-side limit we can't script around.</li>
         <li>Angel One has no option-chain OI endpoint — this dashboard uses it for live Portfolio positions only. Greeks/IV/OI on the Option Chain and Greeks tabs all come from Groww.</li>
+        <li>SEBI requires broker API calls to come from a whitelisted static IP — set that up at <code>[Backend URL]/api/myip</code> + groww.in/trade-api/api-keys → "Update static IP" (and the same field on Angel's developer portal).</li>
         <li>No part of this dashboard promises profits — buildup/strategy signals are your own Excel's heuristics, replicated as-is.</li>
       </ul>
     </div>
@@ -401,9 +385,9 @@ table.gt td:first-child,table.gt th:first-child,table.pt td:first-child,table.pt
     <div class="sc" style="grid-column:1/-1">
       <h3>🚀 <span>Deploy steps</span></h3>
       <ol class="step-ol">
-        <li><b>Backend:</b> Push <code>server.js</code> + <code>package.json</code> to a new GitHub repo → <a href="https://render.com" target="_blank">render.com</a> → New → Web Service → connect repo → Build: <code>npm install</code> → Start: <code>npm start</code> → Deploy.</li>
-        <li>On Render: Environment tab → add the Groww + Angel One variables listed in the cards above → Save (auto-redeploys).</li>
-        <li>Copy your Render URL (e.g. <code>nifty-backend.onrender.com</code>) → paste into Backend URL above → Save & Test.</li>
+        <li><b>Backend:</b> run <code>server.js</code> + <code>package.json</code> anywhere Node runs — <code>npm install</code> then <code>npm start</code>. (Render: connect a repo with these 2 files, Build <code>npm install</code>, Start <code>npm start</code>. Laptop/phone: same 2 commands in a terminal, plus a tunnel like ngrok if it needs to be reachable from the internet.)</li>
+        <li>Open <code>[Backend URL]/setup</code> → enter Groww + Angel keys there → Save All → Test.</li>
+        <li>Paste that same Backend URL above → Save & Test Connection.</li>
         <li><b>Frontend:</b> Upload this <code>index.html</code> to <a href="https://github.com/maheshmaximusmax/Nifty-Dashboard" target="_blank">your GitHub repo</a> → Settings → Pages → Source: main/root.</li>
         <li>Live at <a href="https://maheshmaximusmax.github.io/Nifty-Dashboard/" target="_blank">maheshmaximusmax.github.io/Nifty-Dashboard/</a> within a minute or two.</li>
       </ol>
@@ -531,7 +515,9 @@ function setSrc(type, label) {
 async function api(path, params) {
   const url = new URL(S.backend.replace(/\/$/,'') + path);
   Object.entries(params||{}).forEach(([k,v]) => url.searchParams.set(k,v));
-  const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  // Harmless for any normal backend; specifically needed if your tunnel is
+  // ngrok, whose free tier otherwise shows a warning page instead of JSON.
+  const r = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'ngrok-skip-browser-warning': 'true' } });
   const data = await r.json();
   if (!r.ok || data.error) throw new Error(data.error || ('HTTP '+r.status));
   return data;
@@ -600,7 +586,7 @@ async function doFetch(manual) {
     renderAll();
   } catch (e) {
     setSrc('err', 'Failed: ' + e.message);
-    document.getElementById('errMsg').textContent = 'Data fetch failed: ' + e.message + ' — check backend URL and Render env vars in Settings.';
+    document.getElementById('errMsg').textContent = 'Data fetch failed: ' + e.message + ' — check Backend URL in Settings and that keys are saved at [Backend URL]/setup.';
     document.getElementById('errBar').classList.add('show');
   }
   document.getElementById('lastUpd').textContent = '⏱ ' + new Date().toLocaleTimeString('en-IN');
