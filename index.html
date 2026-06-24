@@ -379,6 +379,7 @@ table.antbl tr:hover td{background:var(--bg3)}
         <option value="BANKNIFTY">BANKNIFTY</option>
         <option value="FINNIFTY">FINNIFTY</option>
         <option value="MIDCPNIFTY">MIDCPNIFTY</option>
+          <option value="NIFTYNXT50">NIFTY NEXT 50</option>
       </select>
     </div>
     <div class="ctrl-grp"><span class="ctrl-lbl">Expiry</span><select id="expSel" onchange="onExpChange()"></select></div>
@@ -441,6 +442,7 @@ table.antbl tr:hover td{background:var(--bg3)}
           <select class="ns" id="nseSymSel" onchange="onNSESymChange()">
             <option value="NIFTY">NIFTY</option><option value="BANKNIFTY">BANKNIFTY</option>
             <option value="FINNIFTY">FINNIFTY</option><option value="MIDCPNIFTY">MIDCPNIFTY</option>
+          <option value="NIFTYNXT50">NIFTY NEXT 50</option>
           </select>
         </div>
         <div class="nse-or">OR</div>
@@ -1316,7 +1318,7 @@ function processData(json) {
   rows.forEach(d => {
     if(!d) return;
     // Try all possible field names
-    const exp = d.expiryDate || d.expiry || d.expirydate || d.ExpiryDate;
+    const exp = d.expiryDate || d.expiryDates || d.expiry || d.expirydate || d.ExpiryDate;
     const strike = d.strikePrice ?? d.strike ?? d.strikeprice ?? d.StrikePrice;
     if(exp==null || strike==null) return;
     expSet.add(exp);
@@ -1861,7 +1863,7 @@ function loadSample() {
   const exps=[];const d=new Date();
   for(let i=0;i<8;i++){while(d.getDay()!==4)d.setDate(d.getDate()+1);exps.push(d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-'));d.setDate(d.getDate()+1);}
   S.expiries=exps;
-  const stkInt=sym==='BANKNIFTY'?100:sym==='MIDCPNIFTY'?25:50;
+  const stkInt=(sym==='BANKNIFTY'||sym==='NIFTYNXT50')?100:sym==='MIDCPNIFTY'?25:50;
   const strikes=[];
   for(let s=S.atm-stkInt*40;s<=S.atm+stkInt*40;s+=stkInt)strikes.push(s);
   const map={};
