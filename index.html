@@ -1001,9 +1001,8 @@ gunicorn</div>
       <div class="fr">
         <label>Gemini Model</label>
         <select id="sGemModel">
-          <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fastest)</option>
-          <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-          <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Best Free - Recommended)</option>
+          <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (Fastest)</option>
         </select>
       </div>
       <div style="display:flex;gap:8px">
@@ -1066,7 +1065,7 @@ const S = {
   raw:null, filtered:[], expiries:[], expiry:'', symbol:'NIFTY',
   spot:0, atm:0, refreshTimer:null, refreshSec:10,
   proxyUrl:'', proxyType:'cloudflare',
-  gemKey:'', gemModel:'gemini-2.0-flash',
+  gemKey:'', gemModel:'gemini-2.5-flash',
   angelKey:'', angelClientId:'', angelToken:'',
   angelConnected:false,
   charts:{}, chatHist:[], theme:'dark',
@@ -1750,21 +1749,52 @@ async function fetchAngelPositions() {
 function disconnectAngel(){S.angelToken='';S.angelConnected=false;localStorage.removeItem('nop3_angelConnected');document.getElementById('angelNotConn').style.display='block';document.getElementById('angelConn').style.display='none';}
 
 // GEMINI AI
-function updateAICtx() {
-  const d=S.filtered; if(!d.length){document.getElementById('aiCtx').textContent='Load data first...';return;}
-  const ceOI=d.reduce((s,r)=>s+(r.CE?.openInterest||0),0);
-  const peOI=d.reduce((s,r)=>s+(r.PE?.openInterest||0),0);
-  const pcr=(ceOI?peOI/ceOI:0).toFixed(2);
+function buildFullContext() {
+  const d=S.filtered; if(!d.length) return null;
+  let totCeOi=0,totPeOi=0,totCeVol=0,totPeVol=0,totCeChg=0,totPeChg=0;
+  let maxCeOi={oi:-1,strike:0},maxPeOi={oi:-1,strike:0},maxCeChg={chg:-1e18,strike:0},maxPeChg={chg:-1e18,strike:0};
+  d.forEach(r=>{const ce=r.CE||{},pe=r.PE||{};
+    const ceOi=ce.openInterest||0,peOi=pe.openInterest||0,ceCh=ce.changeinOpenInterest||0,peCh=pe.changeinOpenInterest||0;
+    totCeOi+=ceOi;totPeOi+=peOi;totCeVol+=ce.totalTradedVolume||0;totPeVol+=pe.totalTradedVolume||0;totCeChg+=ceCh;totPeChg+=peCh;
+    if(ceOi>maxCeOi.oi)maxCeOi={oi:ceOi,strike:r.strike};
+    if(peOi>maxPeOi.oi)maxPeOi={oi:peOi,strike:r.strike};
+    if(ceCh>maxCeChg.chg)maxCeChg={chg:ceCh,strike:r.strike};
+    if(peCh>maxPeChg.chg)maxPeChg={chg:peCh,strike:r.strike};
+  });
+  const pcr=totCeOi?totPeOi/totCeOi:0;
+  const intradayBull=maxCeChg.chg>maxPeChg.chg;
+  const positionalBull=maxCeOi.oi<maxPeOi.oi;
+  let score=0; score+=intradayBull?1:-1; score+=positionalBull?1:-1; score+=(pcr>1)?1:-1;
+  let bias=score>=2?'STRONG BULLISH':score===1?'MILD BULLISH':score===0?'NEUTRAL':score===-1?'MILD BEARISH':'STRONG BEARISH';
   const mp=calcMaxPain(d);
   const atR=d.reduce((p,c)=>Math.abs(c.strike-S.atm)<Math.abs(p.strike-S.atm)?c:p,d[0]);
-  document.getElementById('aiCtx').textContent=`Symbol: ${S.symbol} | Spot: ${n2(S.spot)} | ATM: ${S.atm}
-Expiry: ${S.expiry}
-CE OI: ${fmtOI(ceOI)} | PE OI: ${fmtOI(peOI)} | PCR: ${pcr}
-Max Pain: ${mp}
-ATM CE IV: ${(atR?.CE?.impliedVolatility||0).toFixed(2)}% | ATM PE IV: ${(atR?.PE?.impliedVolatility||0).toFixed(2)}%
-ATM CE LTP: ₹${(atR?.CE?.lastPrice||0).toFixed(2)} | ATM PE LTP: ₹${(atR?.PE?.lastPrice||0).toFixed(2)}
-Top CE OI: ${d.reduce((m,r)=>((r.CE?.openInterest||0)>(m.CE?.openInterest||0)?r:m),d[0]).strike}
-Top PE OI: ${d.reduce((m,r)=>((r.PE?.openInterest||0)>(m.PE?.openInterest||0)?r:m),d[0]).strike}`;
+  const r=S.spot*0.008, hi=S.spot+r, lo=S.spot-r, rng=hi-lo;
+  const cam={R3:(S.spot+rng*1.1/4).toFixed(0),R2:(S.spot+rng*1.1/6).toFixed(0),R1:(S.spot+rng*1.1/12).toFixed(0),S1:(S.spot-rng*1.1/12).toFixed(0),S2:(S.spot-rng*1.1/6).toFixed(0),S3:(S.spot-rng*1.1/4).toFixed(0)};
+  return {
+    symbol:S.symbol,spot:S.spot,atm:S.atm,expiry:S.expiry,
+    totCeOi,totPeOi,pcr:pcr.toFixed(2),
+    pcrSignal:pcr>1.3?'Strong Bullish':pcr>1?'Bullish':pcr>0.7?'Neutral':pcr>0.5?'Bearish':'Strong Bearish',
+    maxCeOi,maxPeOi,maxCeChg,maxPeChg,totCeChg,totPeChg,
+    intraday:intradayBull?'BULLISH':'BEARISH',
+    positional:positionalBull?'BULLISH':'BEARISH',
+    bias,score,maxPain:mp,
+    atmCeIV:(atR?.CE?.impliedVolatility||0).toFixed(2),atmPeIV:(atR?.PE?.impliedVolatility||0).toFixed(2),
+    atmCeLtp:(atR?.CE?.lastPrice||0).toFixed(2),atmPeLtp:(atR?.PE?.lastPrice||0).toFixed(2),
+    cam
+  };
+}
+function updateAICtx() {
+  const c=buildFullContext();
+  if(!c){document.getElementById('aiCtx').textContent='Load data first...';return;}
+  document.getElementById('aiCtx').textContent=`${c.symbol} | Spot ₹${n2(c.spot)} | ATM ${c.atm} | Exp ${c.expiry}
+PCR ${c.pcr} (${c.pcrSignal})
+Intraday: ${c.intraday} | Positional: ${c.positional}
+Overall Bias: ${c.bias} (${c.score>0?'+':''}${c.score}/3)
+Max Pain: ${c.maxPain}
+Resistance (max CE OI): ${c.maxCeOi.strike}
+Support (max PE OI): ${c.maxPeOi.strike}
+ATM IV: CE ${c.atmCeIV}% PE ${c.atmPeIV}%
+Camarilla R1 ${c.cam.R1} S1 ${c.cam.S1}`;
 }
 
 async function sendChat() {
@@ -1773,8 +1803,9 @@ async function sendChat() {
   inp.value='';
   addMsg('user',msg);
   const think=showThink();
-  const ctx=document.getElementById('aiCtx').textContent;
-  S.chatHist.push({role:'user',parts:[{text:`Current option chain:\n${ctx}\n\nUser question: ${msg}`}]});
+  const c=buildFullContext();
+  const ctxBlock = c ? JSON.stringify(c,null,1) : 'No live data loaded yet.';
+  S.chatHist.push({role:'user',parts:[{text:'LIVE MARKET DATA (current, real-time):\n'+ctxBlock+'\n\nUSER QUESTION: '+msg}]});
   try {
     const reply=await callGemini(S.chatHist);
     removeThink(think);
@@ -1787,11 +1818,36 @@ async function sendChat() {
   }
 }
 
+
+const SYSTEM_PROMPT = `You are the user's personal NIFTY/index options analyst. You follow EXACTLY this methodology (from the user's own Excel system):
+
+OI BUILDUP RULES (Price change + OI change):
+- Price UP + OI UP = Long Buildup (bullish for that side)
+- Price DOWN + OI UP = Short Buildup (bearish)
+- Price UP + OI DOWN = Short Covering (bullish)
+- Price DOWN + OI DOWN = Long Liquidation (bearish)
+
+SIGNAL RULES:
+- INTRADAY signal = compare Max Change-in-OI: if max CE change-OI > max PE change-OI then watch for resistance (bearish bias), else bullish. (field 'intraday' already computed)
+- POSITIONAL signal = compare Max OI: if max CE OI < max PE OI then bullish (more put writing = support below), else bearish. (field 'positional' already computed)
+- PCR > 1 = bullish bias, < 1 = bearish. (field 'pcr','pcrSignal')
+- OVERALL BIAS = combined score of the above (field 'bias','score').
+- Max OI Call strike = Resistance. Max OI Put strike = Support.
+- Max Pain = strike where option buyers lose most (price often gravitates here near expiry).
+
+HOW TO ANSWER:
+- The LIVE MARKET DATA JSON in the user message is current real data. Use ONLY it for numbers — never invent.
+- Answer in the user's language mix (Gujarati/Hindi/English), short and actionable.
+- Use ₹ for prices. Give specific strikes and levels from the data.
+- When asked for a view, state the bias, the key support/resistance, and a clear actionable note.
+- NEVER guarantee profit. Mention risk briefly when giving trade ideas.
+- If data shows market is closed/stale, say so.`;
+
 async function callGemini(hist) {
   const key=S.gemKey; if(!key)throw new Error('Gemini API key not set.');
-  const model=S.gemModel||'gemini-2.0-flash';
+  const model=S.gemModel||'gemini-2.5-flash';
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-  const body={contents:hist,generationConfig:{maxOutputTokens:800,temperature:0.7},systemInstruction:{parts:[{text:'You are an expert NIFTY options analyst. Answer in the user\'s language (Gujarati/Hindi/English). Be concise and actionable. Use ₹ for currency.'}]}};
+  const body={contents:hist,generationConfig:{maxOutputTokens:1200,temperature:0.7},systemInstruction:{parts:[{text:SYSTEM_PROMPT}]}};
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error?.message||'Gemini error '+r.status);}
   const data=await r.json();
